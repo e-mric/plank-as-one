@@ -105,7 +105,7 @@ Targets and analytics implementation remain TBD.
 - The product has no hard maximum plank duration.
 - Because MVP 1 has no portable account, progression and streak history are tied to the current browser profile.
 
-Whether a participant may complete multiple successful sessions in the same challenge day remains to be confirmed. The recommended rule is one canvas contribution and one progression increase per browser identity per challenge day, with unlimited retries before success.
+Participants receive unlimited retries until they succeed. Each anonymous browser identity can record exactly one successful completion, one progression increase, and one earned pixel per UTC challenge day.
 
 ### 8.2 Form validation
 
@@ -116,7 +116,7 @@ MVP 1 checks:
 - Bent knees.
 - Incorrect head position.
 
-Poor form receives a five-second grace period before the timer pauses. The recommended interpretation is five continuous seconds: returning to valid form clears the grace countdown. Thresholds should use hysteresis or smoothing so the timer does not rapidly alternate between valid and invalid states.
+Poor form receives a five-second grace period before the timer pauses. Invalid time in the grace window does not count toward the required duration. Returning to valid form clears the grace countdown and resumes accumulation. Thresholds should use hysteresis or smoothing so the timer does not rapidly alternate between valid and invalid states.
 
 The product should accept different camera positions, but it cannot validate joints that the model cannot see reliably. MVP 1 must therefore require the landmarks needed by its checks to meet a minimum visibility threshold. A side or three-quarter view that includes at least one visible chain of ear, shoulder, hip, knee, and ankle is recommended. “Any angle” and “partial body” are goals, not guarantees.
 
@@ -131,13 +131,19 @@ The product should accept different camera positions, but it cannot validate joi
 ### 8.4 Canvas contribution
 
 - A participant may place a pixel only after completing the day’s required session.
+- The main-page primary action reflects the participant’s daily state:
+  - Before successful completion: active `START 30 SEC`.
+  - After completion but before placement: active `PLACE YOUR PIXEL`.
+  - After successful placement: disabled `YOUR PIXEL IS LIVE`.
 - The canvas uses an effectively unbounded coordinate space rather than a fixed participant capacity.
 - The Leader’s prepared pixel-art image is displayed at low opacity as the shared target.
 - Participants place earned pixels over the target artwork.
+- A pixel placed over the target automatically uses the color defined by the artwork at that coordinate.
+- Occupied coordinates cannot be overwritten. Pixel placement must claim an empty coordinate atomically so simultaneous participants cannot take the same position.
 - After the target artwork has been filled, subsequent participants may place pixels elsewhere on the canvas.
 - Previous daily canvases are accessible from an archive tab.
 
-Pixel collision behavior, color selection, and moderation remain to be confirmed.
+For pixels placed outside the target after its completion, MVP 1 should use a Leader-defined fallback color, defaulting to the product accent orange. Moderation remains to be confirmed.
 
 ### 8.5 Leader workflow
 
@@ -146,6 +152,10 @@ For MVP 1, an authorized administrator can:
 - Upload a prepared pixel-art image.
 - Enter the daily challenge settings.
 - Schedule or publish the daily challenge.
+
+The Leader signs in through a Supabase magic link. Access is restricted to an allow-list of administrator email addresses.
+
+Uploaded artwork is limited to a `64 × 64` logical pixel grid for MVP 1. Transparent source pixels are not placement targets. Larger images must be rejected or deliberately downsampled during the Leader preview rather than silently changing their meaning.
 
 An in-app pixel-art editor is out of scope.
 
@@ -176,9 +186,22 @@ The visible Cemantle page confirms a single numbered daily puzzle and a previous
 8. Pause the timer if invalid form continues beyond the grace period.
 9. Retry a failed or abandoned session.
 10. Complete one qualifying daily session.
-11. Choose an available canvas coordinate and place one earned pixel.
-12. See new community pixels without reloading the page.
-13. Browse previous read-only canvases.
+11. Return to the main canvas, where `PLACE YOUR PIXEL` replaces `START 30 SEC`.
+12. Choose an available canvas coordinate and place one earned pixel.
+13. See the selected cell become live and the disabled action change to `YOUR PIXEL IS LIVE`.
+14. See new community pixels without reloading the page.
+15. Browse previous read-only canvases.
+
+### Responsive and browser experience
+
+1. Use the full participant flow on phone, tablet, laptop, or desktop layouts.
+2. Support current evergreen Chrome, Edge, Firefox, and Safari on desktop and mobile where the required camera, WebAssembly, and browser APIs are available.
+3. Provide touch, pointer, and keyboard interaction for canvas placement and navigation.
+4. Detect unsupported capabilities before the session starts and explain the exact missing requirement.
+5. Preserve canvas viewing, archives, and informational pages even when pose tracking is unavailable.
+6. Require a secure HTTPS context for deployed camera use.
+
+“Works everywhere” is treated as a broad compatibility goal, not a promise for obsolete browsers, embedded webviews, devices without usable cameras, or platforms lacking required APIs. The launch acceptance matrix must include at least Android Chrome, iOS Safari, macOS Safari/Chrome, and Windows Chrome/Edge/Firefox.
 
 ### Leader experience
 
@@ -248,7 +271,7 @@ The Python pose lab is not a production backend. It is used by the pose team to 
 
 - Use an HTML Canvas 2D renderer for MVP 1; thousands of square pixels do not justify WebGL complexity yet.
 - Store pixels as integer `x`, `y`, `color`, `challenge_id`, and anonymous `owner_id` values.
-- Add a unique constraint on `(challenge_id, x, y)` if overwriting is not allowed.
+- Add a unique constraint on `(challenge_id, x, y)` so overwriting is not allowed.
 - Query and draw only the current viewport when the coordinate space grows beyond the initial artwork.
 - Add zoom and pan only if required by the supplied design; otherwise start with a bounded visible area that can expand in chunks.
 
@@ -281,22 +304,93 @@ The Python pose lab is not a production backend. It is used by the pose team to 
 - With no duration maximum, long-term targets may eventually become unsafe, impractical, or impossible for some participants.
 - Browser-only identity means streak loss is expected when site storage is cleared or a different device is used.
 
-## 14. Open decisions
+## 14. Design direction
 
-- Whether valid intervals accumulate toward the target or only uninterrupted valid time counts.
-- Whether users get unlimited retries and exactly one successful contribution per UTC day.
-- Whether a valid interval clears the five-second poor-form grace immediately or after a recovery delay.
+### 14.1 Visual foundation supplied by the team
+
+The supplied concept establishes the preferred visual language:
+
+- Warm cream-to-peach background with a soft central glow.
+- Bright coral-orange as the primary action and completion color.
+- Artwork made from small square cells with narrow spacing.
+- Empty target cells shown as extremely light outlines.
+- Large typographic artwork integrated into the canvas rather than placed in a conventional card.
+- Pixel-style interface typography using **Pixelify Sans** across headings, labels, timers, buttons, and supporting copy. The production web application should load the actual font rather than approximate it.
+- A minimal top-right menu control. The main page does not show a persistent “PERFECT FORM” heading; form status appears only during camera setup and the active session.
+- Generous whitespace and almost no container chrome.
+
+The design should preserve this restraint. New features should appear as light overlays, edge controls, compact status strips, or temporary bottom sheets rather than a dashboard of opaque cards.
+
+### 14.2 Proposed adaptation A — Canvas Monument
+
+Use the supplied composition as the home screen almost unchanged. The shared artwork remains the dominant object. Add:
+
+- A compact top status row containing current target, streak, and local reset countdown.
+- A small archive/menu control in the top-right corner.
+- A bottom-centered primary action: `START 30 SEC` before completion, `PLACE YOUR PIXEL` after completion, or disabled `YOUR PIXEL IS LIVE` after placement.
+- A subtle completion count beneath the canvas.
+
+Best for emotional impact and fidelity to the supplied design. Less information is immediately visible, so secondary features live in sheets or the menu.
+
+### 14.3 Proposed adaptation B — Ritual Split
+
+On wide screens, place the artwork in roughly two-thirds of the viewport and a narrow ritual rail in the remaining third. The rail contains target duration, streak, reset countdown, privacy note, and the primary action. On mobile, the rail becomes a bottom sheet beneath the canvas.
+
+Best balance of clarity and visual character. This is the recommended production direction because it scales cleanly from desktop to mobile without covering the art.
+
+### 14.4 Proposed adaptation C — Immersive Session
+
+During exercise, replace the canvas with the local camera view while retaining the same background, pixel vocabulary, and monospace typography. Show:
+
+- A large pixel timer.
+- A thin landmark skeleton or joint markers.
+- The current state: `GET IN FRAME`, `PERFECT FORM`, `FIX HIPS`, `STRAIGHTEN KNEES`, `LIFT HEAD`, or `PAUSED`.
+- A five-cell grace indicator that empties once per invalid second.
+- A persistent local-processing badge.
+
+After completion, morph the timer cells into the participant’s earned pixel and transition directly into placement mode.
+
+### 14.5 Supporting screens
+
+- **Camera setup:** illustrated framing guide, permission explanation, device-local privacy promise, and readiness checks.
+- **Pixel placement:** zoomed target, earned pixel attached to pointer/finger, automatic target color, occupied-cell feedback, confirm action, and realtime celebration.
+- **Archive:** date-grouped thumbnail grid using the same outlined-pixel treatment; selecting a day opens a read-only canvas.
+- **Leader:** restrained utility layout for magic-link access, 64 × 64 upload/preview, date, challenge settings, validation errors, and publish state.
+- **Unsupported device:** capability checklist with viewing/archive access preserved.
+
+### 14.6 Accessibility requirements
+
+- Coral and pale outline colors must meet appropriate contrast when they communicate status; color alone cannot indicate valid or invalid form.
+- All form feedback must have text and optional audio/haptic equivalents where supported.
+- Respect reduced-motion preferences for pixel pulses, transitions, and completion effects.
+- Provide keyboard-operable pixel placement and visible focus treatment.
+- Offer a mirrored camera preview without mirroring pose-coordinate calculations incorrectly.
+- Keep controls reachable and labels readable at mobile sizes and high zoom.
+
+### 14.7 Primary desktop journey
+
+The MVP’s principal journey should read as one continuous ritual:
+
+1. **Today’s canvas:** the participant arrives on a desktop main page dominated by the partially completed `PLANK AS ONE` artwork. Filled coral squares show community contributions and pale outlined squares show remaining targets. The page also shows a seven-day streak, local reset countdown, archive/menu access, and `START 30 SEC`. It does not show `PERFECT FORM` at the top.
+2. **Ready position:** after selecting `START 30 SEC`, the participant sees the local camera area represented in the design as a pixel-art person and framing guide. The interface waits until the required landmarks are visible and the participant is ready to enter a plank.
+3. **Three-second countdown:** once readiness is confirmed, the interface shows a clear `3`, `2`, `1` countdown with optional sound. The timer has not started yet.
+4. **Active plank:** the participant is shown in a pixel-art plank pose with local pose landmarks and a `00:00 / 00:30` progress timer. Form states and the five-second grace indicator appear here when needed.
+5. **Earned pixel on the main page:** after 30 valid seconds, the participant returns to the same main page. `START 30 SEC` has been replaced by the active `PLACE YOUR PIXEL` button. Selecting it enables placement mode on the artwork; the participant chooses an unoccupied outlined target and confirms the placement. The pixel automatically takes that target coordinate’s artwork color.
+6. **Pixel live:** after the placement transaction succeeds, the selected cell is filled and visible on the shared canvas. The primary button becomes disabled and reads `YOUR PIXEL IS LIVE`. The participant cannot place another pixel or restart the daily session until the next UTC challenge.
+
+Transitions should visually connect the stages: the start button becomes the countdown, the countdown becomes the timer, and the completed timer resolves into the earned pixel.
+
+## 15. Open decisions
+
 - Exact pose visibility and joint-angle thresholds, smoothing window, and supported orientations.
-- Whether canvas pixels have fixed colors from the target, user-selected colors, or a limited palette.
-- Whether pixels are first-come-first-served, may overwrite existing pixels, or must be placed in empty coordinates.
-- Maximum source-art dimensions and how the image maps to the integer canvas grid.
-- How the Leader authenticates in MVP 1.
+- Exact fallback-color behavior for placements outside a completed target.
+- Pixel moderation and removal policy.
 - MVP launch audience, expected concurrency, and supported browsers/devices.
 - Required analytics and consent experience.
 - Accessibility and alternatives for users unable or unwilling to use a camera.
 - Five-day acceptance criteria and deployment ownership.
 
-## 15. Five-day delivery recommendation
+## 16. Five-day delivery recommendation
 
 ### Day 1 — prove the risky path
 
@@ -327,7 +421,7 @@ The Python pose lab is not a production backend. It is used by the pose team to 
 
 The release should be treated as a pilot unless the team can test pose accuracy across a meaningful range of bodies, devices, lighting conditions, and camera placements within the five-day window.
 
-## 16. Technical references
+## 17. Technical references
 
 - [MediaPipe Pose Landmarker for Web](https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker/web_js)
 - [Supabase anonymous sign-ins](https://supabase.com/docs/guides/auth/auth-anonymous)
@@ -335,9 +429,8 @@ The release should be treated as a pilot unless the team can test pose accuracy 
 - [Supabase Realtime database changes](https://supabase.com/docs/guides/realtime/subscribing-to-database-changes)
 - [Supabase Storage](https://supabase.com/docs/guides/storage)
 - [SvelteKit on Vercel](https://vercel.com/docs/frameworks/full-stack/sveltekit)
-- [Cemantle](https://cemantle.certitudes.org/)
 
-## 17. Decision log
+## 18. Decision log
 
 | Date | Decision | Status |
 | --- | --- | --- |
@@ -354,3 +447,13 @@ The release should be treated as a pilot unless the team can test pose accuracy 
 | 2026-07-14 | Use a single worldwide UTC challenge day and show reset time locally. | Recommended |
 | 2026-07-14 | Use Supabase anonymous Auth rather than a raw browser-generated identifier. | Recommended |
 | 2026-07-14 | Keep Python outside the production pose-validation path. | Recommended |
+| 2026-07-15 | Allow unlimited retries but only one success, progression increase, and pixel per UTC day. | Confirmed |
+| 2026-07-15 | Invalid time, including the five-second grace window, does not count toward the duration. | Confirmed |
+| 2026-07-15 | Target pixels automatically use the artwork’s color. | Confirmed |
+| 2026-07-15 | Occupied pixels cannot be overwritten. | Confirmed |
+| 2026-07-15 | MVP artwork is limited to a 64 × 64 logical grid. | Confirmed |
+| 2026-07-15 | The Leader uses allow-listed Supabase magic-link authentication. | Confirmed |
+| 2026-07-15 | MVP targets current major desktop and mobile browsers with graceful capability fallback. | Confirmed |
+| 2026-07-15 | All product UI text uses the Pixelify Sans pixel font. | Confirmed |
+| 2026-07-15 | The main page does not display “PERFECT FORM”; form status is session-only. | Confirmed |
+| 2026-07-15 | The main-page CTA progresses from `START 30 SEC` to `PLACE YOUR PIXEL` to disabled `YOUR PIXEL IS LIVE`. | Confirmed |
