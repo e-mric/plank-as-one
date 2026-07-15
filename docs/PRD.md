@@ -1,10 +1,18 @@
 # The Plank Canvas — Product Requirements Document
 
-**Status:** MVP definition draft  
-**Last updated:** 2026-07-15
-**Target:** MVP 1 web application released after its acceptance and safety gates pass
-**Hackathon:** OpenAI Build Week, submission deadline 2026-07-21 at 5:00 p.m. PDT
-**Submission review:** [Build Week compliance and submission checklist](./BUILD_WEEK_REVIEW_CHECKLIST.md)
+| Field | Value |
+| --- | --- |
+| Status | Reviewed MVP definition draft; unresolved release decisions remain |
+| Last updated | 2026-07-15 |
+| Target | MVP 1 web application released after its acceptance and safety gates pass |
+| Hackathon | OpenAI Build Week, submission deadline 2026-07-21 at 5:00 p.m. PDT |
+| Submission review | [Build Week compliance and submission checklist](./BUILD_WEEK_REVIEW_CHECKLIST.md) |
+
+> **Reader guide:** The core product context is visible below. Detailed product rules, architecture, design, testing, roadmap, and appendices are grouped into collapsible panels. Resolve the release-critical decisions in section 16 before a public pilot.
+
+<details open>
+<summary><strong>Product context (sections 1–3)</strong> — summary, problem, and vision</summary>
+
 
 ## 1. Product summary
 
@@ -24,6 +32,12 @@ Today, prospective users commonly follow videos or exercise alone. These approac
 ## 3. Product vision
 
 Turn a solitary daily exercise into a flexible collective ritual: every valid plank advances both the participant’s discipline and a piece of art the community creates together.
+
+</details>
+
+<details>
+<summary><strong>Product strategy (sections 4–7)</strong> — users, value, goals, measures, and constraints</summary>
+
 
 ## 4. Target users
 
@@ -51,9 +65,9 @@ Participants are not required to attend at a fixed time. A successful session pe
 
 The browser uses TensorFlow.js Pose Detection with MoveNet to estimate the participant’s pose entirely on-device. Browser-side TypeScript rules evaluate the returned keypoints and provide immediate form feedback. When form remains invalid beyond the grace period, the timer pauses. Camera frames and pose keypoints never leave the device.
 
-### Optional live presence
+### Post-MVP live presence
 
-When multiple users happen to plank simultaneously, their pixels can pulse or light up, creating spontaneous shared presence without transmitting video.
+In a future release, when multiple users happen to plank simultaneously, their pixels could pulse or light up, creating spontaneous shared presence without transmitting video. Live presence is not part of MVP 1.
 
 ## 6. Goals and proposed success measures
 
@@ -72,7 +86,7 @@ When multiple users happen to plank simultaneously, their pixels can pulse or li
 - **Form improvement:** reduction in form-break frequency over repeated sessions, subject to defining a safe and meaningful measurement.
 - **Community participation:** activity around proposing or voting on future artwork, postures, or exercises; likely post-MVP.
 
-Targets and analytics implementation remain TBD.
+Numeric targets and analytics implementation remain TBD. Before the pilot, the team must assign an owner and target for challenge-start conversion, valid-session completion, pixel-placement completion, and day-seven retention.
 
 ## 7. Hard constraints
 
@@ -90,6 +104,7 @@ Targets and analytics implementation remain TBD.
 ### Delivery and cost
 
 - Delivery is milestone-based rather than constrained to a fixed five-day deadline.
+- The Build Week submission remains date-bound. If the public-release safety and acceptance gates have not passed by the submission deadline, the team may submit a controlled demo or preview but must not treat that deadline as authorization for a public release.
 - AI-assisted implementation may accelerate development, but it does not waive privacy, safety, accessibility, browser-compatibility, or test requirements.
 - Infrastructure and ongoing operating costs should be kept as low as practical.
 
@@ -98,12 +113,18 @@ Targets and analytics implementation remain TBD.
 - The shared canvas must efficiently represent and render potentially thousands of revealed pixels.
 - The system must support users loading changing canvas state throughout the day.
 
+</details>
+
+<details>
+<summary><strong>MVP definition (sections 8–10)</strong> — confirmed rules, functional scope, and exclusions</summary>
+
+
 ## 8. Confirmed MVP 1 product rules
 
 ### 8.1 Daily challenge progression
 
 - A new browser starts with a 30-second target.
-- After the participant successfully completes a daily session, their next daily target increases by five seconds.
+- After the participant successfully completes a daily session, their target for the next UTC challenge day increases by five seconds.
 - An incomplete session does not increase the next target.
 - The product has no hard maximum plank duration.
 - Because MVP 1 has no portable account, progression and streak history are tied to the current browser profile.
@@ -128,7 +149,7 @@ The product should accept different camera positions, but it cannot validate joi
 - No registration, email, password, or social login is required.
 - MVP 1 uses an automatically created anonymous browser identity.
 - Progress is not portable across browsers or devices.
-- Clearing site data, using private browsing, or losing the browser session can reset the participant’s identity, streak, duration, and completion history.
+- Clearing site data, using private browsing, or losing the locally stored anonymous session can reset the participant’s identity, streak, duration, and completion history.
 - MVP 2 may allow the anonymous identity to be upgraded to a permanent account.
 
 ### 8.4 Canvas contribution
@@ -172,8 +193,6 @@ MVP 1 uses one global challenge for the whole community, following the global da
 - Daylight-saving changes do not alter the UTC boundary.
 - The previous challenge becomes read-only and remains available in the archive.
 - Leaders should publish challenges in advance; selecting the active challenge by UTC date avoids requiring a scheduled reset job.
-
-The visible Cemantle page confirms a single numbered daily puzzle and a previous-day result, but does not state its exact timezone. The UTC rule above is the recommended concrete interpretation for a shared worldwide canvas.
 
 ### 8.7 First-visit introduction
 
@@ -243,6 +262,12 @@ Live-presence animation is excluded from MVP 1. Realtime is used for completed p
 - Live pulsing or visualization of users who are currently planking.
 - Scope not expressly accepted in this PRD.
 
+</details>
+
+<details>
+<summary><strong>Architecture and risk (sections 11–13)</strong> — stack, implementation requirements, security, privacy, and early validation</summary>
+
+
 ## 11. Recommended technical approach
 
 ### 11.0 Confirmed production stack
@@ -298,8 +323,10 @@ The production system contains no Python pose service. If the AI/ML team uses Py
 - Enforce one completion and one pixel entitlement per anonymous user and challenge with database uniqueness constraints, not only UI checks.
 - Store uploaded source artwork in Supabase Storage.
 - Use database functions/RPCs for completion claims and pixel placement so entitlement consumption, collision checks, and pixel insertion occur atomically.
-- Load an initial canvas snapshot over the Supabase Data API, then use a challenge-specific Supabase Realtime Broadcast channel for new pixel placements.
+- Load an initial canvas snapshot over the Supabase Data API, then subscribe to a private, challenge-specific Supabase Realtime Broadcast channel for new pixel placements.
 - Treat Postgres as authoritative after reconnect: refetch changes or the current viewport instead of assuming that every realtime event was received.
+- Emit authoritative placement events from the database only after the atomic placement transaction succeeds. Participant clients must not be able to publish authoritative pixel events.
+- Authorize private Broadcast subscriptions with RLS policies on `realtime.messages`, scoped to the challenge topic.
 - Broadcast compact pixel events containing only challenge ID, integer coordinates, color, and server timestamp.
 - Do not use Presence in MVP 1.
 
@@ -369,6 +396,12 @@ Compatibility and accessibility:
 - A mandatory or lengthy introduction can delay the core action and reduce first-session conversion; it must be immediately skippable and measured separately from challenge starts.
 - Referencing a recognizable film scene without permission creates intellectual-property and brand risk. The default production asset must be an original scene with the same emotional idea, not copied film imagery.
 - BDNF, blood-pressure, arterial-stiffness, cardiac-health, and rehabilitation statements have different evidence bases and are not all plank-specific. Overstated captions could become misleading health claims.
+
+</details>
+
+<details>
+<summary><strong>Experience design (section 14)</strong> — visual direction, primary journey, introduction, accessibility, and health-claim treatment</summary>
+
 
 ## 14. Design direction
 
@@ -454,9 +487,9 @@ The introduction explains the product emotionally before it explains it function
 
 #### Story sequence
 
-1. **Struggle alone:** an original pixel-art protagonist attempts a plank in a quiet room. His arms shake, the form indicator degrades, and he lowers himself to the floor. The scene communicates effort and frustration without mocking failure.
-2. **A social spark:** while resting, he looks toward a television. The screen shows a lone runner who gradually attracts a group of runners. The scene is composed so a licensed character asset could be inserted later, but the production default remains an original runner rather than an unlicensed recreation of Forrest Gump or Tom Hanks.
-3. **Try again:** inspired by the group, the protagonist plants his elbows, resets his posture, and begins a new plank with visibly calmer form.
+1. **Struggle alone:** an original pixel-art protagonist attempts a plank in a quiet room. Their arms shake, the form indicator degrades, and they lower themselves to the floor. The scene communicates effort and frustration without mocking failure.
+2. **A social spark:** while resting, they look toward a television. The screen shows a lone runner who gradually attracts a group of runners. The scene is composed so a licensed character asset could be inserted later, but the production default remains an original runner rather than an unlicensed recreation of Forrest Gump or Tom Hanks.
+3. **Try again:** inspired by the group, the protagonist plants their elbows, resets their posture, and begins a new plank with visibly calmer form.
 4. **Effort becomes company:** square pixels fall from above, gather around him, and assemble into other people holding planks. Each figure should form from the same cell language used by the shared artwork.
 5. **Benefits appear:** as the camera pulls upward, short evidence-reviewed captions appear between the growing groups. Captions remain secondary to the story and never interrupt scrolling.
 6. **The collective image:** the camera continues to zoom out until the protagonist and the surrounding participants resolve into the pixel letterforms `PLANK AS ONE`.
@@ -507,6 +540,12 @@ Show no more than three or four short benefit captions in the animation. Prefix 
 #### MVP boundary and measurement
 
 For MVP 1, begin with limited sprite poses, crossfades, camera transforms, and batched pixel effects. Frame-by-frame character acting, licensed movie content, voice-over, and bespoke music remain optional enhancements after the core sequence is validated. Track only privacy-safe product events: intro shown, skipped, completed, replayed, and challenge started after intro. Compare skip and completion rates to determine whether the sequence helps or delays participation.
+
+</details>
+
+<details>
+<summary><strong>Quality and validation (section 15)</strong> — Storybook catalogue, automated tests, integration contracts, and release gates</summary>
+
 
 ## 15. Testing strategy
 
@@ -578,16 +617,28 @@ A frontend feature is ready for integration when its required stories exist, acc
 - Manual tests cover the supported browser/device matrix, actual camera permissions, pose accuracy, WebGL fallback, reconnect behavior, and UTC rollover.
 - No test or story transmits camera frames or pose streams outside the browser.
 
+</details>
+
 ## 16. Open decisions
 
-- Exact pose visibility and joint-angle thresholds, smoothing window, and supported orientations.
+### Must resolve before a public pilot
+
+- **Progression safety:** reconcile the confirmed no-maximum progression rule with the long-duration safety risk. Define a reviewed ceiling, deload/rest behavior, or an alternative progression rule, plus pain/stop guidance.
+- **Pose acceptance:** define exact landmark-visibility and joint-angle thresholds, smoothing window, supported orientations, and the manual device/body-diversity acceptance protocol.
+- **Launch envelope:** define the pilot audience, expected concurrency, minimum supported browser/device matrix, and measurable pass criteria.
+- **Health and accessibility:** approve the safety notice and health captions, and define an alternative experience for participants unable or unwilling to use a camera.
+- **Release ownership:** assign deployment, rollback, incident response, and final release authorization.
+
+### May resolve during implementation or pilot planning
+
 - Exact fallback-color behavior for placements outside a completed target.
 - Pixel moderation and removal policy.
-- MVP launch audience, expected concurrency, and supported browsers/devices.
-- Required analytics and consent experience.
-- Final intro duration, approved health captions, audio direction, protagonist treatment, and whether licensed film imagery will ever be pursued.
-- Accessibility and alternatives for users unable or unwilling to use a camera.
-- Final release acceptance criteria and deployment ownership.
+- Required analytics, numeric success targets, retention window, and consent experience.
+- Final intro duration, audio direction, protagonist treatment, and whether licensed film imagery will ever be pursued.
+
+<details>
+<summary><strong>Delivery roadmap (section 17)</strong> — eight dependency- and evidence-gated milestones</summary>
+
 
 ## 17. Implementation roadmap
 
@@ -662,6 +713,12 @@ Development follows dependency and evidence milestones rather than calendar days
 
 **Exit gate:** every test gate in section 15.5 passes, no unresolved critical privacy or safety issue remains, and the team explicitly authorizes release.
 
+</details>
+
+<details>
+<summary><strong>Appendices (sections 18–19)</strong> — technical references and decision log</summary>
+
+
 ## 18. Technical references
 
 - [TensorFlow.js Pose Detection models](https://github.com/tensorflow/tfjs-models/tree/master/pose-detection)
@@ -671,7 +728,8 @@ Development follows dependency and evidence milestones rather than calendar days
 - [pixi-viewport](https://github.com/pixijs-userland/pixi-viewport)
 - [Supabase anonymous sign-ins](https://supabase.com/docs/guides/auth/auth-anonymous)
 - [Supabase Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security)
-- [Supabase Realtime database changes](https://supabase.com/docs/guides/realtime/subscribing-to-database-changes)
+- [Supabase Realtime Broadcast](https://supabase.com/docs/guides/realtime/broadcast)
+- [Supabase Realtime Authorization](https://supabase.com/docs/guides/realtime/authorization)
 - [Supabase Storage](https://supabase.com/docs/guides/storage)
 - [SvelteKit on Vercel](https://vercel.com/docs/frameworks/full-stack/sveltekit)
 - [Storybook for SvelteKit](https://storybook.js.org/docs/get-started/frameworks/sveltekit)
@@ -692,11 +750,11 @@ Development follows dependency and evidence milestones rather than calendar days
 | 2026-07-14 | MVP 1 target delivery window is five days. | Superseded on 2026-07-15 |
 | 2026-07-14 | Daily duration starts at 30 seconds and increases by five seconds after success, with no hard maximum. | Confirmed |
 | 2026-07-14 | Poor form has a five-second grace period before the timer pauses. | Confirmed |
-| 2026-07-14 | MVP 1 requires no user registration and stores identity/progress per browser session. | Confirmed |
+| 2026-07-14 | MVP 1 requires no user registration and stores identity/progress per anonymous browser profile. | Confirmed |
 | 2026-07-14 | A participant places a pixel only after successful session completion. | Confirmed |
 | 2026-07-14 | The Leader uploads prepared artwork; an art editor is excluded. | Confirmed |
 | 2026-07-14 | Previous canvases remain available in an archive tab. | Confirmed |
-| 2026-07-14 | Use a single worldwide UTC challenge day and show reset time locally. | Recommended |
+| 2026-07-14 | Use a single worldwide UTC challenge day and show reset time locally. | Confirmed |
 | 2026-07-14 | Use Supabase anonymous Auth rather than a raw browser-generated identifier. | Recommended |
 | 2026-07-14 | Keep Python outside the production pose-validation path. | Recommended |
 | 2026-07-15 | Allow unlimited retries but only one success, progression increase, and pixel per UTC day. | Confirmed |
@@ -711,7 +769,7 @@ Development follows dependency and evidence milestones rather than calendar days
 | 2026-07-15 | The main-page CTA progresses from `START 30 SEC` to `PLACE YOUR PIXEL` to disabled `YOUR PIXEL IS LIVE`. | Confirmed |
 | 2026-07-15 | Use SvelteKit and TypeScript for the web application. | Confirmed |
 | 2026-07-15 | Use TensorFlow.js MoveNet for browser-only pose detection; no camera or keypoint stream is sent to the backend. | Confirmed |
-| 2026-07-15 | Use PixiJS v8 with pixi-viewport v6 for the interactive artwork. | Recommended |
+| 2026-07-15 | Use PixiJS v8 with pixi-viewport v6 for the interactive artwork. | Confirmed |
 | 2026-07-15 | Use Supabase for Postgres, anonymous Auth, Storage, atomic database functions, and Realtime Broadcast. | Confirmed |
 | 2026-07-15 | Frontend development begins with Storybook, typed mock data, and deterministic stories for every application state before backend and real pose integration. | Confirmed |
 | 2026-07-15 | New browser identities receive a skippable, replayable, scroll-driven pixel-art introduction before the daily canvas. | Confirmed |
@@ -721,3 +779,5 @@ Development follows dependency and evidence milestones rather than calendar days
 | 2026-07-15 | BDNF and mental resilience remain separate claims: BDNF wording is qualified and evidence-linked, while resilience is presented as practiced habit and persistence. | Recommended |
 | 2026-07-15 | Replace the five-day deadline with a milestone-based, acceptance-gated implementation roadmap suitable for AI-assisted development. | Confirmed |
 | 2026-07-15 | Use the Build Week compliance checklist as a required release and submission review gate. | Confirmed |
+
+</details>
