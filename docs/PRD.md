@@ -1,7 +1,7 @@
 # The Plank Canvas — Product Requirements Document
 
 **Status:** MVP definition draft  
-**Last updated:** 2026-07-14  
+**Last updated:** 2026-07-15
 **Target:** MVP 1 web application in five days
 
 ## 1. Product summary
@@ -47,7 +47,7 @@ Participants are not required to attend at a fixed time. A successful session pe
 
 ### On-device AI form validation
 
-The browser uses the device camera and on-device pose estimation, currently proposed as MediaPipe, to evaluate posture. When form breaks, the timer pauses and the interface provides immediate visual feedback.
+The browser uses TensorFlow.js Pose Detection with MoveNet to estimate the participant’s pose entirely on-device. Browser-side TypeScript rules evaluate the returned keypoints and provide immediate form feedback. When form remains invalid beyond the grace period, the timer pauses. Camera frames and pose keypoints never leave the device.
 
 ### Optional live presence
 
@@ -228,34 +228,50 @@ Live-presence animation is excluded from the recommended five-day MVP. Realtime 
 
 ## 11. Recommended technical approach
 
+### 11.0 Confirmed production stack
+
+- **Application:** SvelteKit with TypeScript.
+- **AI/ML:** TensorFlow.js Pose Detection running in the participant’s browser.
+- **Artwork renderer:** PixiJS v8 with pixi-viewport v6.
+- **Backend:** Supabase Postgres, Auth, Storage, database functions, and Row Level Security.
+- **Realtime:** Supabase Realtime Broadcast.
+- **Hosting:** Vercel for SvelteKit and hosted Supabase for backend services.
+
 ### 11.1 Monorepo layout
 
 ```text
 plank-as-one/
   apps/
     web/                 # SvelteKit participant and Leader application
-  services/
-    pose-lab/            # Python experiments, threshold evaluation, fixtures
+  packages/
+    pose-engine/         # Browser-only TensorFlow.js adapter and form rules
+    canvas-engine/       # PixiJS artwork renderer and coordinate logic
   supabase/
     migrations/          # Schema, functions, triggers, and RLS policies
     seed.sql              # Local/test data
-  packages/
-    shared/               # Shared contracts if they become necessary
+  tools/
+    pose-lab/            # Optional offline fixtures/analysis; never production
   docs/
     PRD.md
 ```
 
-The Python pose lab is not a production backend. It is used by the pose team to analyze recorded, consented test fixtures offline and turn validated rules into browser-side TypeScript. No camera frame is sent from the web application to Python or any server.
+The production system contains no Python pose service. If the AI/ML team uses Python for offline experiments, it remains under `tools/pose-lab` and operates only on explicitly consented test fixtures. Validated thresholds are implemented and tested in the TypeScript `pose-engine` package. No camera frame is sent from the web application to Python or any server.
 
 ### 11.2 Web and pose processing
 
 - Use SvelteKit with TypeScript.
-- Use MediaPipe Pose Landmarker through `@mediapipe/tasks-vision` in the browser.
-- Load MediaPipe only on the session page and run it in `VIDEO` mode.
-- Move inference to a Web Worker if the MVP device tests show unacceptable interface blocking.
+- Use `@tensorflow-models/pose-detection` with TensorFlow.js in the browser.
+- Use MoveNet `SINGLEPOSE_LIGHTNING` for MVP 1 because only one participant is expected and latency is more important than multi-person detection.
+- Register the TensorFlow.js WebGL backend as the default and keep the WASM backend as a compatibility fallback.
+- Load TensorFlow.js, the backend, and the model only on the session route; do not include them in the main-page bundle.
+- Enable MoveNet temporal smoothing and establish explicit minimum keypoint-confidence thresholds through device testing.
+- Throttle inference to the rate required for stable feedback rather than processing every camera frame. Start testing around 20–30 inferences per second and reduce the rate on slower devices.
+- Consider a Web Worker only after measuring the target browsers; worker transfer and camera-frame plumbing are not required for the first implementation.
 - Calculate joint angles, visibility checks, smoothing, the form state machine, and the session timer entirely in the browser.
 - Do not transmit raw frames, screenshots, landmarks, or per-frame angles in MVP 1.
 - Send only the final business event needed to claim a completion, such as challenge ID, anonymous user ID from the access token, target duration, and completion timestamp.
+- Dispose of the detector and TensorFlow tensors, stop camera tracks, and release associated resources when the session route is left.
+- Suspend or destroy the PixiJS renderer while the TensorFlow session is active so both systems do not compete unnecessarily for WebGL contexts, GPU memory, and battery.
 
 ### 11.3 Data, identity, and realtime updates
 
@@ -264,22 +280,50 @@ The Python pose lab is not a production backend. It is used by the pose team to 
 - Enable Row Level Security on every exposed table.
 - Enforce one completion and one pixel entitlement per anonymous user and challenge with database uniqueness constraints, not only UI checks.
 - Store uploaded source artwork in Supabase Storage.
-- Load an initial canvas snapshot, then use a challenge-specific Supabase Realtime Broadcast channel for new pixel placements.
+- Use database functions/RPCs for completion claims and pixel placement so entitlement consumption, collision checks, and pixel insertion occur atomically.
+- Load an initial canvas snapshot over the Supabase Data API, then use a challenge-specific Supabase Realtime Broadcast channel for new pixel placements.
+- Treat Postgres as authoritative after reconnect: refetch changes or the current viewport instead of assuming that every realtime event was received.
+- Broadcast compact pixel events containing only challenge ID, integer coordinates, color, and server timestamp.
 - Do not use Presence in MVP 1.
 
-### 11.4 Canvas rendering
+### 11.4 Artwork rendering
 
-- Use an HTML Canvas 2D renderer for MVP 1; thousands of square pixels do not justify WebGL complexity yet.
+Use **PixiJS v8** as the artwork renderer and **pixi-viewport v6** as its 2D camera. Use PixiJS directly rather than a Svelte wrapper so lifecycle, version compatibility, and performance remain under team control.
+
+Rationale:
+
+- PixiJS uses GPU-accelerated WebGL/WebGL2 in production and batches simple sprites/graphics efficiently.
+- pixi-viewport v6 supports PixiJS v8 and supplies mouse drag, touch drag, pinch zoom, wheel zoom, and deceleration.
+- The retained scene graph supports the target outline, completed pixels, selection cursor, and short realtime animations without building a full editor.
+- Konva is better suited to manipulating many independent editable shapes; that scene-graph overhead is not needed because MVP participants select one logical grid coordinate rather than edit artwork objects.
+- A hand-written Canvas 2D implementation would minimize dependencies but would require the team to build zoom, pan, transforms, pointer mapping, culling, and interaction behavior during the five-day window.
+
+Implementation requirements:
+
+- Initialize PixiJS only in the browser from a Svelte component after mount; never initialize it during server-side rendering.
+- Use PixiJS’s stable WebGL renderer for MVP 1. Do not enable WebGPU in production while its cross-browser behavior remains experimental.
+- Configure `antialias: false`, align transforms to device pixels, and use integer world coordinates so square cells remain crisp.
+- Use pixi-viewport for drag, pinch, wheel, and deceleration, but clamp zoom to readable and selectable cell sizes.
+- Organize the scene into target-outline, completed-pixel, placement-preview, and transient-animation layers.
+- Batch cells by state/color instead of creating an interactive event target for every square.
+- Convert the pointer’s world position mathematically into integer grid coordinates. Validate availability against local state, then confirm atomically with Supabase.
 - Store pixels as integer `x`, `y`, `color`, `challenge_id`, and anonymous `owner_id` values.
-- Add a unique constraint on `(challenge_id, x, y)` so overwriting is not allowed.
-- Query and draw only the current viewport when the coordinate space grows beyond the initial artwork.
-- Add zoom and pan only if required by the supplied design; otherwise start with a bounded visible area that can expand in chunks.
+- Add a unique database constraint on `(challenge_id, x, y)` so overwriting is impossible.
+- Partition large canvases into logical chunks and fetch/render only chunks intersecting the current viewport.
+- Enable PixiJS culling or equivalent application-level chunk culling when substantial content lies offscreen.
+- Stop the PixiJS ticker and render on demand while the canvas is static. Temporarily animate only new-pixel and completion effects to reduce battery use.
+- Destroy the PixiJS application, viewport listeners, textures, and subscriptions when the component unmounts.
+
+Compatibility and accessibility:
+
+- If WebGL initialization fails, provide a non-interactive Canvas 2D or server-generated image snapshot so the artwork and archives remain viewable. Pixel placement may be disabled with a clear capability message in this fallback.
+- Canvas content is not inherently accessible. Mirror the important state in DOM text, expose completion counts and selection coordinates to assistive technology, and provide keyboard controls for moving and confirming the placement cursor.
 
 ### 11.5 Hosting
 
 - Deploy SvelteKit to Vercel using the official Vercel adapter.
 - Use hosted Supabase for Postgres, Auth, Storage, and Realtime.
-- Do not deploy a Python service for MVP 1. It would add hosting, integration, latency, and privacy complexity without being needed in the production flow.
+- Do not deploy a Python or separate AI inference service for MVP 1. It would add hosting, integration, latency, and privacy complexity without being needed in the production flow.
 
 ## 12. Security, privacy, and integrity position
 
@@ -303,6 +347,8 @@ The Python pose lab is not a production backend. It is used by the pose team to 
 - An unbounded canvas needs collision rules and a viewport strategy even if participant capacity is unlimited.
 - With no duration maximum, long-term targets may eventually become unsafe, impractical, or impossible for some participants.
 - Browser-only identity means streak loss is expected when site storage is cleared or a different device is used.
+- TensorFlow.js and PixiJS both use GPU resources; their lifecycles must not overlap unnecessarily on constrained devices.
+- A PixiJS/WebGL canvas requires a DOM accessibility layer and a view-only fallback when GPU initialization is unavailable.
 
 ## 14. Design direction
 
@@ -340,7 +386,7 @@ Best balance of clarity and visual character. This is the recommended production
 
 ### 14.4 Proposed adaptation C — Immersive Session
 
-During exercise, replace the canvas with the local camera view while retaining the same background, pixel vocabulary, and monospace typography. Show:
+During exercise, replace the canvas with the local camera view while retaining the same background, pixel vocabulary, and Pixelify Sans typography. Show:
 
 - A large pixel timer.
 - A thin landmark skeleton or joint markers.
@@ -395,7 +441,8 @@ Transitions should visually connect the stages: the start button becomes the cou
 ### Day 1 — prove the risky path
 
 - Scaffold the monorepo and deployments.
-- Prove camera permission, MediaPipe loading, landmark visibility, and one side-view plank rule on target devices.
+- Prove camera permission, TensorFlow.js MoveNet loading, WebGL/WASM backend selection, landmark visibility, and one side-view plank rule on target devices.
+- Prove PixiJS initialization, crisp pixel rendering, pan/zoom, and coordinate selection on one desktop and one phone.
 - Define the Supabase schema, anonymous identity, and RLS baseline.
 
 ### Day 2 — complete the session loop
@@ -406,7 +453,7 @@ Transitions should visually connect the stages: the start button becomes the cou
 ### Day 3 — complete the shared canvas loop
 
 - Implement challenge loading, completion claim, pixel entitlement, placement transaction, snapshot loading, and realtime pixel updates.
-- Implement the Canvas 2D renderer.
+- Implement the PixiJS renderer, pixi-viewport interaction, chunk model, and DOM accessibility mirror.
 
 ### Day 4 — Leader, archive, and design integration
 
@@ -423,7 +470,11 @@ The release should be treated as a pilot unless the team can test pose accuracy 
 
 ## 17. Technical references
 
-- [MediaPipe Pose Landmarker for Web](https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker/web_js)
+- [TensorFlow.js Pose Detection models](https://github.com/tensorflow/tfjs-models/tree/master/pose-detection)
+- [TensorFlow.js MoveNet](https://github.com/tensorflow/tfjs-models/tree/master/pose-detection/src/movenet)
+- [PixiJS v8 documentation](https://pixijs.com/8.x/guides)
+- [PixiJS performance guidance](https://pixijs.com/8.x/guides/concepts/performance-tips)
+- [pixi-viewport](https://github.com/pixijs-userland/pixi-viewport)
 - [Supabase anonymous sign-ins](https://supabase.com/docs/guides/auth/auth-anonymous)
 - [Supabase Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security)
 - [Supabase Realtime database changes](https://supabase.com/docs/guides/realtime/subscribing-to-database-changes)
@@ -457,3 +508,7 @@ The release should be treated as a pilot unless the team can test pose accuracy 
 | 2026-07-15 | All product UI text uses the Pixelify Sans pixel font. | Confirmed |
 | 2026-07-15 | The main page does not display “PERFECT FORM”; form status is session-only. | Confirmed |
 | 2026-07-15 | The main-page CTA progresses from `START 30 SEC` to `PLACE YOUR PIXEL` to disabled `YOUR PIXEL IS LIVE`. | Confirmed |
+| 2026-07-15 | Use SvelteKit and TypeScript for the web application. | Confirmed |
+| 2026-07-15 | Use TensorFlow.js MoveNet for browser-only pose detection; no camera or keypoint stream is sent to the backend. | Confirmed |
+| 2026-07-15 | Use PixiJS v8 with pixi-viewport v6 for the interactive artwork. | Recommended |
+| 2026-07-15 | Use Supabase for Postgres, anonymous Auth, Storage, atomic database functions, and Realtime Broadcast. | Confirmed |
