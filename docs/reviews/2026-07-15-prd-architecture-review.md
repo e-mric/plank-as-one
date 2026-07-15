@@ -22,6 +22,8 @@
 - Completion and pixel-placement invariants are assigned to atomic database operations rather than UI enforcement alone.
 - The PRD requires an original intro asset unless sufficiently broad rights are documented for any recognizable film-related material.
 - The PRD separates the date-bound Build Week submission from authorization for a public product release.
+- The PRD defines the Build Week deliverable as a free, judging-accessible controlled demo and keeps the public pilot behind separate release gates.
+- The PRD requires a clearly labelled simulated-pose guided demo whose writes are isolated from real participant progression and canvas state.
 - The official rules still state a submission deadline of 2026-07-21 at 5:00 p.m. PDT and require a working project, public demo video, repository, Codex/GPT-5.6 narrative, and `/feedback` Session ID.
 
 ## P0 FAIL
@@ -35,7 +37,7 @@
 - The repository has no README or project license.
 - The primary Codex implementation thread and required `/feedback` Session ID are not designated.
 - Team eligibility and the authorized Representative are not documented.
-- The PRD's public-pilot blockers in section 16 remain unresolved, especially duration-progression safety, pose acceptance thresholds, launch device criteria, health/accessibility treatment, and release ownership.
+- The PRD's public-pilot blockers in section 16 remain unresolved, especially approval of the exact advanced-duration pilot ceiling, pose calibration and the larger public-pilot acceptance protocol, launch device criteria, final intro health captions, and release ownership. The general session safety notice and camera-free honor mode are resolved.
 
 ## P1 findings
 
