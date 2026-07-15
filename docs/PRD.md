@@ -53,6 +53,8 @@ Needs real-time correction to hold an effective, safer plank and learn correct f
 
 Sets the daily challenge, creates the hidden pixel artwork, and provides daily inspiration to the community.
 
+For MVP 1, the Leader is the internal project team rather than a participant-facing role. The team has sole editorial responsibility for choosing, preparing, scheduling, and publishing each challenge's pixel artwork.
+
 > The relationship between the Aspiring Disciplinarian and Form Novice personas remains to be clarified; they may be overlapping user needs rather than mutually exclusive personas.
 
 ## 5. Value proposition
@@ -217,9 +219,9 @@ For pixels placed outside the target after its completion, MVP 1 uses one Leader
 
 ### 8.5 Leader workflow
 
-For MVP 1, an authorized administrator can:
+For MVP 1, the project team acts as the sole Leader and decides which prepared pixel artwork is used for each challenge. An authorized project-team administrator can:
 
-- Upload a prepared pixel-art image.
+- Choose and upload the prepared pixel-art image.
 - Enter the daily challenge settings, including the post-target fallback color.
 - Schedule or publish the daily challenge.
 - Soft-remove a placed pixel after confirming the action and entering a moderation reason.
@@ -291,7 +293,7 @@ Before the standard daily journey, a first-time participant can view or skip the
 ### Leader experience
 
 1. Access a protected administration route.
-2. Upload a small prepared pixel-art image with transparent-background support.
+2. Choose and upload a small prepared pixel-art image with transparent-background support.
 3. Enter the challenge date and settings.
 4. Preview the low-opacity canvas target.
 5. Publish or schedule the challenge.
@@ -303,7 +305,7 @@ Live-presence animation is excluded from MVP 1. Realtime is used for completed p
 - Native mobile applications.
 - Sending, streaming, or storing camera footage.
 - Additional exercises or postures unless required for the initial pilot.
-- Artwork proposals and community voting unless they replace a more expensive Leader workflow.
+- Participant artwork proposals, submissions, and community voting. The internal project team selects all MVP 1 artwork.
 - Social feeds, direct messaging, and video communication.
 - An in-app pixel-art editor.
 - Licensed or unlicensed film clips, film-derived scenes or characters, soundtrack recordings, celebrity likenesses, recognizable costume replication, and branded movie assets in the first-visit introduction. Any licensing initiative is a separate post-MVP project.
@@ -543,7 +545,7 @@ The introduction explains the product emotionally before it explains it function
 #### Story sequence
 
 1. **Struggle alone:** an original pixel-art protagonist attempts a plank in a quiet room. Their arms shake, the form indicator degrades, and they lower themselves to the floor. The scene communicates effort and frustration without mocking failure.
-2. **A social spark:** while resting, they look toward a television. The screen shows an original lone runner who gradually attracts a group of runners. The scene conveys social momentum without recreating or referencing a recognizable film character, actor, costume, composition, or branded asset.
+2. **A social spark:** while still on the ground after the first attempt, the figure looks toward a television. The screen shows an original lone runner who gradually attracts a group of runners. The scene conveys social momentum without recreating or referencing a recognizable film character, actor, costume, composition, or branded asset.
 3. **Try again:** inspired by the group, the protagonist plants their elbows, resets their posture, and begins a new plank with visibly calmer form.
 4. **Effort becomes company:** square pixels fall from above, gather around them, and assemble into other people holding planks. Each figure should form from the same cell language used by the shared artwork.
 5. **Benefits appear:** as the camera pulls upward, short evidence-reviewed captions appear between the growing groups. Captions remain secondary to the story and never interrupt scrolling.
@@ -765,7 +767,7 @@ Development follows dependency and evidence milestones rather than calendar days
 - Implement allow-listed magic-link access, prepared artwork upload, 64 × 64 validation, preview, challenge settings, scheduling, publishing, and actionable error states.
 - Verify Storage policies, Leader authorization, invalid-file handling, transparent-pixel behavior, and UTC challenge activation.
 
-**Exit gate:** only authorized Leaders can publish a valid challenge, and a published challenge appears correctly to anonymous participants and in the archive.
+**Exit gate:** only allow-listed project-team Leaders can publish a valid challenge, and a published challenge appears correctly to anonymous participants and in the archive.
 
 ### Milestone 7 — first-visit introduction
 
@@ -873,5 +875,6 @@ Development follows dependency and evidence milestones rather than calendar days
 | 2026-07-15 | Intro audio is optional original ambient/chiptune music with simple effects, muted by default, with no voice-over and a persistent sound toggle; the story remains complete without sound. | Confirmed |
 | 2026-07-15 | Use an original, gender-neutral pixel-art protagonist without celebrity likeness or MVP customization, surrounded by deliberately varied participants that avoid gender, cultural, fitness, and body-type stereotypes. | Confirmed |
 | 2026-07-15 | Selecting an available canvas cell immediately submits the permanent pixel placement with no confirmation dialog or second click; the placement screen warns users in advance, and failed transactions preserve the entitlement. | Confirmed |
+| 2026-07-15 | The internal project team is the sole MVP 1 Leader and has editorial responsibility for choosing, preparing, scheduling, and publishing the pixel artwork; participant submissions and community voting are post-MVP. | Confirmed |
 
 </details>
