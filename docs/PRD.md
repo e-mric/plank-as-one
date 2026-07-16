@@ -135,11 +135,11 @@ Numeric product targets and the future public-pilot event allow-list are intenti
 ### 8.1 Daily challenge progression
 
 - A new browser starts with a 30-second target.
-- After the participant successfully completes a daily session, their target for the next UTC challenge day increases by five seconds, up to the default 120-second cap.
+- After the participant successfully completes a daily session, their target for the next UTC challenge day increases by two seconds, up to the default 120-second cap.
 - An incomplete session does not increase the next target.
 - At 120 seconds, automatic progression stops and the participant's next daily target remains 120 seconds.
 - The Build Week release and public pilot use 120 seconds as a hard ceiling. Progression beyond 120 seconds and its unlock control are disabled.
-- A future release may enable participant-controlled progression beyond 120 seconds only after a separate safety review approves and configures a higher ceiling. If enabled, duration never increases automatically; following each successful day, the participant chooses either `KEEP MY TARGET` or `ADD 5 SECONDS` for the next UTC challenge day.
+- A future release may enable participant-controlled progression beyond 120 seconds only after a separate safety review approves and configures a higher ceiling. If enabled, duration never increases automatically; following each successful day, the participant chooses either `KEEP MY TARGET` or `ADD 2 SECONDS` for the next UTC challenge day.
 - A participant may reduce their future target without losing their current streak.
 - Acknowledging guidance alone never enables advanced progression; the release must also have a safety-approved higher ceiling and the feature must be explicitly configured on.
 - Unlocking, if introduced later, is an informed product choice, not medical clearance or a claim that longer holds are appropriate for every participant.
@@ -906,5 +906,6 @@ Development follows dependency and evidence milestones rather than calendar days
 | 2026-07-16 | Anonymous realtime presence is included in MVP 1: active reservations pulse, committed pixels lock, released reservations disappear, and clients show an aggregate active count without exposing identity, exact personal timers, camera state, form state, or completion method. | Confirmed |
 | 2026-07-16 | Product presence is synchronized from authoritative reservation lifecycle events. Each participant and coordinate may have at most one active reservation; server expiry and heartbeat renewal prevent abandoned cells from remaining blocked. | Confirmed |
 | 2026-07-16 | Initial reservation timing defaults to a heartbeat every 10 seconds, expiry 30 seconds after the latest accepted heartbeat, and an absolute deadline equal to target duration plus 180 seconds capped at 300 seconds; the public-pilot operating envelope must validate or revise these values. | Confirmed for implementation; pilot validation required |
+| 2026-07-17 | Successful daily duration progression increases the next target by two seconds rather than five, while retaining the 120-second hard ceiling. | Confirmed |
 
 </details>

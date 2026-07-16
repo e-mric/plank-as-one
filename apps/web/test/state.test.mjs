@@ -42,7 +42,7 @@ test('countdown enters active and honor mode commits at target', () => {
   assert.equal(s.cells.find((cell) => cell.status === 'locked' && cell.id === s.selectedCell)?.status, 'locked');
   assert.equal(s.completions, 1);
   assert.equal(s.completionMethod, 'honor');
-  assert.equal(s.target, 7);
+  assert.equal(s.target, 4);
 });
 
 test('camera low-hips form gets five-second grace and then pauses; valid resumes', () => {

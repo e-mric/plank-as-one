@@ -106,7 +106,7 @@ export function tick(state, milliseconds) {
   return {
     ...state, stage: 'complete', creditedMs: state.target * 1000, cells,
     completions: state.completions + 1, streak: state.streak + 1, todayCount: state.todayCount + 1,
-    target: Math.min(120, state.target + 5), completionMethod: state.mode, lastOutcome: 'complete', notice: 'PIXEL COMMITTED · NICE WORK',
+    target: Math.min(120, state.target + 2), completionMethod: state.mode, lastOutcome: 'complete', notice: 'PIXEL COMMITTED · NICE WORK',
   };
 }
 
