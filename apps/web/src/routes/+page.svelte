@@ -16,15 +16,19 @@
       ? 'PIXEL COMMITTED · NICE WORK'
       : state.notice || (state.mode === 'honor' ? 'FORM NOT CAMERA-VALIDATED' : 'CHOOSE A ROUTE TO BEGIN');
   $: timerLabel = state.stage === 'countdown' ? String(Math.ceil(state.countdown)) : String(Math.floor(state.creditedMs / 1000)).padStart(2, '0');
-  $: pose = (state.stage === 'active' || state.stage === 'complete') && state.form === 'valid'
-    ? { src: '/poses/pose-perfect.png', alt: 'Pixel-art person holding a perfect plank' }
+  $: pose = state.lastOutcome === 'complete'
+    ? { kind: 'celebrate', src: '/poses/pose-celebrate.png', alt: 'Pixel-art person celebrating a completed plank' }
+    : state.lastOutcome === 'failed'
+      ? { kind: 'exhausted', src: '/poses/pose-exhausted.png', alt: 'Pixel-art person exhausted after an incomplete plank' }
+      : (state.stage === 'active' || state.stage === 'complete') && state.form === 'valid'
+        ? { kind: 'perfect', src: '/poses/pose-perfect.png', alt: 'Pixel-art person holding a perfect plank' }
     : state.stage === 'grace' || state.stage === 'paused' || state.form !== 'valid'
-      ? { src: '/poses/pose-bad.png', alt: 'Pixel-art person holding a bad plank form' }
-      : { src: '/poses/pose-ready.png', alt: 'Pixel-art person in the ready position' };
+      ? { kind: 'bad', src: '/poses/pose-bad.png', alt: 'Pixel-art person holding a bad plank form' }
+      : { kind: 'ready', src: '/poses/pose-ready.png', alt: 'Pixel-art person in the ready position' };
 
   function dispatch(action: Action) { state = reduce(state, action); }
   function chooseMode(mode: string) { dispatch({ type: 'choose-mode', mode }); }
-  function resetToRoutes() { state = createInitialState({ ...state, mode: null, stage: 'idle' }); }
+  function resetToRoutes() { state = createInitialState({ ...state, mode: null, stage: 'idle', lastOutcome: null }); }
 
   onMount(() => {
     interval = setInterval(() => {
@@ -64,7 +68,7 @@
   </section>
 
   <section class="pose-slot" aria-label="Pixel person holding a plank">
-    <img src={pose.src} alt={pose.alt} />
+    <img class={pose.kind} src={pose.src} alt={pose.alt} />
   </section>
   <div class="privacy-note">CAMERA AND FORM VALIDATION STAY ON THIS DEVICE</div>
 
@@ -93,8 +97,8 @@
   .page { width:min(980px,100%); min-height:100vh; margin:auto; padding:32px 28px 44px; }
   .status-row { display:flex; align-items:center; justify-content:space-between; gap:12px; }.status-group { display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
   .chip { display:inline-flex; align-items:center; min-height:38px; padding:9px 13px; border:1px solid var(--line); border-radius:999px; background:rgba(255,250,245,.88); color:var(--muted); font:700 11px/1 var(--mono); letter-spacing:.02em; }.chip.live { gap:9px; }.live-dot { width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 0 5px rgba(76,167,106,.14); }
-  .hero { width:min(650px,100%); margin:58px auto 0; text-align:center; }.brand-title { margin:0 0 8px; color:var(--coral); font:700 clamp(30px,6vw,52px)/.95 var(--mono); letter-spacing:.04em; }.mode-chip { margin-bottom:8px; }.timer { margin:0; font:700 clamp(52px,11vw,108px)/.9 var(--mono); letter-spacing:-.08em; }.timer small { font-size:.22em; letter-spacing:0; margin-left:8px; color:var(--muted); }.validation { display:inline-flex; align-items:center; gap:8px; margin-top:16px; padding:9px 13px; border:1px solid var(--line); border-radius:999px; color:var(--muted); background:rgba(255,250,245,.85); font:700 10px var(--mono); }.validation i { width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px rgba(76,167,106,.14); }
-  .pose-slot { width:min(560px,100%); margin:22px auto 0; text-align:center; }.pose-slot img { display:block; width:100%; height:auto; max-height:180px; object-fit:contain; image-rendering:pixelated; }.privacy-note { margin:10px auto 0; color:var(--muted); font:700 10px var(--mono); text-align:center; }
+  .hero { width:min(650px,100%); margin:58px auto 0; text-align:center; }.brand-title { margin:0 0 8px; color:var(--coral); font:700 clamp(30px,6vw,52px)/.95 var(--mono); letter-spacing:.04em; }.mode-chip { margin-bottom:8px; background:transparent; }.timer { margin:0; font:700 clamp(52px,11vw,108px)/.9 var(--mono); letter-spacing:-.08em; }.timer small { font-size:.22em; letter-spacing:0; margin-left:8px; color:var(--muted); }.validation { display:inline-flex; align-items:center; gap:8px; margin-top:16px; padding:9px 13px; border:1px solid var(--line); border-radius:999px; color:var(--muted); background:rgba(255,250,245,.85); font:700 10px var(--mono); }.validation i { width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px rgba(76,167,106,.14); }
+  .pose-slot { width:min(560px,100%); margin:22px auto 0; text-align:center; }.pose-slot img { display:block; width:100%; height:auto; max-height:180px; object-fit:contain; image-rendering:pixelated; }.pose-slot img.exhausted { max-height:105px; }.privacy-note { margin:10px auto 0; color:var(--muted); font:700 10px var(--mono); text-align:center; }
   .panel { margin:26px auto 0; width:min(660px,100%); border:1px solid var(--line); border-radius:16px; background:rgba(255,250,245,.78); padding:18px; box-shadow:0 8px 30px rgba(120,61,35,.06); }.panel h2 { margin:0 0 8px; font-size:18px; }.panel p { margin:7px 0; color:var(--muted); line-height:1.45; font-size:14px; }.routes { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:15px; }.btn { border:1px solid var(--coral); border-radius:999px; padding:10px 15px; background:transparent; color:var(--coral-dark); font:700 11px var(--mono); letter-spacing:.02em; }.btn:hover,.btn.primary { background:var(--coral); color:#fff; }.safety { text-align:left; }.safety h2 { font:700 14px var(--mono); letter-spacing:.06em; }.safety strong { color:var(--coral-dark); }.safety-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:14px; }
   .canvas-wrap { position:relative; width:min(760px,100%); margin:38px auto 0; }.canvas-meta { display:flex; justify-content:flex-end; align-items:baseline; margin-bottom:4px; }.canvas-meta span { color:var(--muted); font:700 10px var(--mono); }
   .canvas { display:grid; grid-template-columns:repeat(var(--art-width),1fr); gap:2px; width:min(720px,100%); margin:0 auto; padding:18px; border:0; background:transparent; }.cell { aspect-ratio:1; min-width:0; border:0; border-radius:1px; background:transparent; padding:0; transition:transform .1s ease,filter .1s; }.cell.target { border:1px solid rgba(255,164,127,.68); background:rgba(255,228,210,.48); }.cell.target:not(:disabled):hover,.cell.target:not(:disabled):focus-visible { transform:scale(1.16); filter:brightness(.96); outline:2px solid var(--coral); outline-offset:1px; }.cell.locked { border-color:var(--coral); background:var(--coral); }.cell.pending,.cell.other { border-color:var(--coral); background:var(--coral); animation:pulse 1.25s ease-in-out infinite; box-shadow:0 0 0 4px rgba(255,90,54,.16); }.cell.other { opacity:.65; animation-delay:-.45s; transform:scale(.72); }.cell.empty { pointer-events:none; }

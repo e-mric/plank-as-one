@@ -25,7 +25,7 @@ The app uses mock data, so no database, account, camera, or backend service is r
 4. Hold the plank for the displayed duration. In Camera mode, the mock form controls demonstrate valid, bad-form, and tracking-loss states.
 5. Complete the challenge to lock the pixel permanently for the session. Ending the session releases the pending pixel so it can be retried.
 
-The character changes between the ready, perfect, and bad poses as the mock challenge state changes. Anonymous active participants and existing pixels are also represented with mock presence data.
+The character changes between ready, perfect, and bad poses as the mock challenge state changes, then shows a celebrating pose on completion or an exhausted pose when an attempt is released. Anonymous active participants and existing pixels are also represented with mock presence data.
 
 ## Useful commands
 
@@ -41,6 +41,5 @@ npm run preview   # Preview the production build locally
 - `apps/web/src/routes/+page.svelte` — main interactive page
 - `apps/web/src/lib/state.js` — challenge state machine and pixel rules
 - `apps/web/src/lib/artwork.js` — PLANK AS ONE pixel-art mask
-- `apps/web/static/poses/` — ready, perfect, and bad character poses
+- `apps/web/static/poses/` — ready, perfect, bad, celebrating, and exhausted character poses
 - `apps/web/test/state.test.mjs` — automated state tests
-

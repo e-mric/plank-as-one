@@ -34,6 +34,7 @@ test('countdown enters active and honor mode commits at target', () => {
   assert.equal(s.stage, 'active');
   s = tick(s, 2000);
   assert.equal(s.stage, 'complete');
+  assert.equal(s.lastOutcome, 'complete');
   assert.equal(s.cells.find((cell) => cell.status === 'locked' && cell.id === s.selectedCell)?.status, 'locked');
   assert.equal(s.completions, 1);
   assert.equal(s.target, 7);
@@ -76,6 +77,7 @@ test('ending an attempt releases pending reservation and permits retry', () => {
   s = selectCell(s, cellId);
   s = endSession(s);
   assert.equal(s.stage, 'ready');
+  assert.equal(s.lastOutcome, 'failed');
   assert.equal(s.cells[cellId].status, 'available');
   assert.equal(s.selectedCell, null);
 });

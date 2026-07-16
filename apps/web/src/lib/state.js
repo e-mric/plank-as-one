@@ -36,6 +36,7 @@ export function createInitialState(overrides = {}) {
     streak: 7,
     completions: 0,
     completionMethod: null,
+    lastOutcome: null,
     notice: '',
     ...overrides,
   };
@@ -57,7 +58,7 @@ export function selectCell(state, cellId) {
   const cell = state.cells.find((item) => item.id === cellId);
   if (!cell || cell.status !== 'available') return state;
   const cells = state.cells.map((item) => item.id === cellId ? { ...item, status: 'pending' } : item);
-  return { ...state, stage: 'countdown', countdown: 3, creditedMs: 0, graceMs: 0, trackingMs: 0, form: 'valid', selectedCell: cellId, cells, notice: '' };
+  return { ...state, stage: 'countdown', countdown: 3, creditedMs: 0, graceMs: 0, trackingMs: 0, form: 'valid', selectedCell: cellId, lastOutcome: null, cells, notice: '' };
 }
 
 export function setForm(state, form) {
@@ -90,14 +91,14 @@ export function tick(state, milliseconds) {
   return {
     ...state, stage: 'complete', creditedMs: state.target * 1000, cells,
     completions: state.completions + 1, streak: state.streak + 1, todayCount: state.todayCount + 1,
-    target: Math.min(120, state.target + 5), completionMethod: state.mode, notice: 'PIXEL COMMITTED · NICE WORK',
+    target: Math.min(120, state.target + 5), completionMethod: state.mode, lastOutcome: 'complete', notice: 'PIXEL COMMITTED · NICE WORK',
   };
 }
 
 export function endSession(state) {
   if (!['countdown', 'active', 'grace', 'paused'].includes(state.stage)) return state;
   const cells = state.cells.map((item) => item.id === state.selectedCell ? { ...item, status: 'available' } : item);
-  return { ...state, stage: 'ready', cells, selectedCell: null, countdown: 0, creditedMs: 0, graceMs: 0, trackingMs: 0, notice: 'SESSION RELEASED · PICK A NEW CELL TO RETRY' };
+  return { ...state, stage: 'ready', cells, selectedCell: null, countdown: 0, creditedMs: 0, graceMs: 0, trackingMs: 0, lastOutcome: 'failed', notice: 'SESSION RELEASED · PICK A NEW CELL TO RETRY' };
 }
 
 export function reduce(state, action) {
