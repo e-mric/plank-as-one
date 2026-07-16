@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Status | Reviewed MVP definition draft; unresolved release decisions remain |
-| Last updated | 2026-07-15 |
+| Last updated | 2026-07-16 |
 | Target | MVP 1 web application released after its acceptance and safety gates pass |
 | Hackathon | OpenAI Build Week, submission deadline 2026-07-21 at 5:00 p.m. PDT |
 | Submission review | [Build Week compliance and submission checklist](./BUILD_WEEK_REVIEW_CHECKLIST.md) |
@@ -67,9 +67,9 @@ Participants are not required to attend at a fixed time. A successful session pe
 
 The browser uses TensorFlow.js Pose Detection with MoveNet to estimate the participant’s pose entirely on-device. Browser-side TypeScript rules evaluate the returned keypoints and provide immediate form feedback. When form remains invalid beyond the grace period, the timer pauses. Camera frames and pose keypoints never leave the device.
 
-### Post-MVP live presence
+### Anonymous live presence
 
-In a future release, when multiple users happen to plank simultaneously, their pixels could pulse or light up, creating spontaneous shared presence without transmitting video. Live presence is not part of MVP 1.
+MVP 1 makes simultaneous participation visible without transmitting video or identity. When a participant reserves a canvas cell and begins a real challenge, that pending pixel pulses on the shared canvas. Other active reservations pulse anonymously at the same time, allowing participants to feel that they are exercising with others even though participation remains asynchronous. A successful challenge turns the pending pixel into a permanent contribution; an incomplete, abandoned, expired, or released attempt removes it.
 
 ## 6. Goals and proposed success measures
 
@@ -86,9 +86,10 @@ In a future release, when multiple users happen to plank simultaneously, their p
 - **Daily challenge completion rate:** percentage of daily active participants who finish a valid session.
 - **Retention and streaks:** participant retention and distribution of consecutive-day streak lengths.
 - **Form improvement:** reduction in form-break frequency over repeated sessions, subject to defining a safe and meaningful measurement.
+- **Live shared participation:** reservation-to-completion rate, reservation release rate, reconnect recovery, and the number of real sessions that overlap with at least one anonymous active participant.
 - **Community participation:** activity around proposing or voting on future artwork, postures, or exercises; likely post-MVP.
 
-Numeric product targets and the future public-pilot event allow-list are intentionally deferred until the pilot audience, sample size, and launch envelope are defined. Before the pilot, the team must assign a measurement owner and targets for challenge-start conversion, valid-session completion, pixel-placement completion, and day-seven retention. Those behavioral targets inform product evaluation but never override privacy, safety, or critical reliability gates. The Build Week demo uses no non-essential product analytics; its evidence comes from deterministic tests, the small consenting tester exercise, and documented observations.
+Numeric product targets and the future public-pilot event allow-list are intentionally deferred until the pilot audience, sample size, and launch envelope are defined. Before the pilot, the team must assign a measurement owner and targets for cell-selection-to-challenge-start conversion, valid-session completion, reserved-pixel commit rate, reservation release rate, and day-seven retention. Those behavioral targets inform product evaluation but never override privacy, safety, or critical reliability gates. The Build Week demo uses no non-essential product analytics; its evidence comes from deterministic tests, the small consenting tester exercise, and documented observations.
 
 ## 7. Hard constraints
 
@@ -100,6 +101,7 @@ Numeric product targets and the future public-pilot event allow-list are intenti
 - The Build Week demo uses no non-essential analytics. Required product state, security logs, and deployment diagnostics are not repurposed as behavioral analytics.
 - A future public pilot may collect first-party product analytics only after explicit opt-in consent. Declining or withdrawing consent does not restrict participation.
 - Raw analytics events are retained for no more than 30 days. Analytics never include camera frames, landmarks, angles, pose classifications, health information, or precise device identifiers.
+- Public live-presence payloads contain no participant identifier, profile, camera state, exact personal timer, form error, pose result, or completion method. They expose only the minimum anonymous cell lifecycle needed to render presence: challenge, coordinate, state, and server timing.
 
 ### Platform
 
@@ -119,6 +121,8 @@ Numeric product targets and the future public-pilot event allow-list are intenti
 
 - The shared canvas must efficiently represent and render potentially thousands of revealed pixels.
 - The system must support users loading changing canvas state throughout the day.
+- The system must synchronize active reservations, releases, and committed pixels with bounded latency while preventing stale reservations from blocking cells indefinitely.
+- The initial MVP objective is for reservation, release, and commit changes to become visible to subscribed clients within two seconds at p95 under the approved concurrency envelope. This is a synchronization target, not a guarantee that every client receives every event; reconnect reconciliation remains mandatory.
 
 </details>
 
@@ -172,11 +176,11 @@ MVP 1 officially supports a left or right side view, including a slight three-qu
 
 Landmark-confidence, joint-angle, hysteresis, and smoothing values live in one versioned pose-rule configuration. Each value documents its units and calibration evidence. Configuration changes require updated recorded-landmark fixtures and affected tests in the same change. A completion may include the active configuration version for diagnostics, but never landmarks, angles, per-frame classifications, or camera data.
 
-For Build Week judging, `VIEW GUIDED DEMO` is available from camera setup and from denied, skipped, or unsupported-camera states. It is persistently labelled `DEMO MODE — SIMULATED POSE DATA` and drives the production UI and timer state machine with deterministic pose states. It demonstrates valid form, corrections, grace timing, completion, and pixel placement against an isolated demo challenge. Demo events never change the real canvas, streak, duration, entitlement, or progression, and submission materials must identify simulated segments clearly.
+For Build Week judging, `VIEW GUIDED DEMO` is available from camera setup and from denied, skipped, or unsupported-camera states. It is persistently labelled `DEMO MODE — SIMULATED POSE DATA` and drives the production UI and timer state machine with deterministic pose states. It demonstrates valid form, corrections, grace timing, isolated reservation, completion/commit, and release against a simulated challenge. Demo events never change the real canvas, presence count, streak, duration, entitlement, or progression, and submission materials must identify simulated segments clearly.
 
 `CONTINUE WITHOUT CAMERA` provides a real honor-mode session for participants unable or unwilling to use a camera. It runs the participant's actual daily target without pose validation or form feedback and persistently displays `FORM NOT CAMERA-VALIDATED`. Honor-mode completion may earn the normal daily streak and pixel. Camera-validated and honor-mode sessions consume the same one-per-challenge completion and pixel entitlement, so a participant cannot complete both on the same day. The completion method is stored as `camera_validated` or `honor`, but contributed pixels look identical. Honor mode uses the same safety guidance and remains distinct from guided demo mode, which never changes real state.
 
-An honor-mode attempt begins after the standard three-second countdown and runs continuously without `PAUSE` or `RESUME` controls. `END SESSION` abandons the attempt without progression, and retries remain unlimited. Switching tabs, backgrounding the browser, locking the device, or navigating away immediately abandons the attempt. On return, the interface shows `SESSION ENDED — KEEP THIS PAGE OPEN DURING HONOR MODE` and offers an immediate retry. The session completes automatically when accumulated active time reaches the participant's daily target. Honor mode never displays form-correction or five-second grace states.
+After honor mode and safety acknowledgment are selected, reserving an available cell triggers the standard three-second countdown. The attempt then runs continuously without `PAUSE` or `RESUME` controls. `END SESSION` abandons the attempt, releases the pending cell, and records no progression; retries remain unlimited. Switching tabs, backgrounding the browser, locking the device, or navigating away immediately abandons the attempt and releases the reservation. On return, the interface shows `SESSION ENDED — KEEP THIS PAGE OPEN DURING HONOR MODE` and offers an immediate retry beginning with a new cell selection. The session completes automatically when accumulated active time reaches the participant's daily target. Honor mode never displays form-correction or five-second grace states.
 
 Before entering either real completion path, the participant sees the following approved notice:
 
@@ -198,22 +202,27 @@ The notice provides `GO BACK` and `I UNDERSTAND` actions. It applies to camera-v
 - Clearing site data, using private browsing, or losing the locally stored anonymous session can reset the participant’s identity, streak, duration, and completion history.
 - MVP 2 may allow the anonymous identity to be upgraded to a permanent account.
 
-### 8.4 Canvas contribution
+### 8.4 Pixel-first reservation and canvas contribution
 
-- A participant may place a pixel only after completing the day’s required session.
-- The main-page primary action reflects the participant’s daily state:
-  - Before successful completion: active `START 30 SEC`.
-  - After completion but before placement: active `PLACE YOUR PIXEL`.
-  - After successful placement: disabled `YOUR PIXEL IS LIVE`.
+- Selecting an available canvas cell is the action that begins a real camera-validated or honor-mode challenge. There is no separate `START 30 SEC` or post-completion `PLACE YOUR PIXEL` action.
+- Before cell selection is enabled, the participant must choose a real challenge route, acknowledge the current safety notice, and complete any required camera permission and framing readiness steps. Guided demo uses an isolated simulated canvas and never reserves a real cell.
 - The canvas uses an effectively unbounded coordinate space rather than a fixed participant capacity.
 - The Leader’s prepared pixel-art image is displayed at low opacity as the shared target.
-- Participants place earned pixels over the target artwork.
-- A pixel placed over the target automatically uses the color defined by the artwork at that coordinate.
-- Occupied coordinates cannot be overwritten. Pixel placement must claim an empty coordinate atomically so simultaneous participants cannot take the same position.
-- Placement mode displays `SELECTING A CELL PLACES YOUR PIXEL IMMEDIATELY` before the participant interacts with the canvas. Clicking or tapping an available cell, or activating the focused cell with the keyboard, immediately submits the permanent placement; there is no confirmation dialog or second action.
-- A collision or network failure returns the participant to placement mode and does not consume the earned-pixel entitlement. Only a successful atomic transaction makes the placement permanent and changes the primary action to `YOUR PIXEL IS LIVE`.
-- After the target artwork has been filled, subsequent participants may place pixels elsewhere on the canvas.
-- Previous daily canvases are accessible from an archive tab.
+- An available target cell previews its artwork color. A cell outside a completed target previews the Leader-defined fallback color.
+- Clicking or tapping an available cell, or activating the focused cell with the keyboard, atomically attempts to reserve that coordinate for the current anonymous participant and challenge attempt. The selection itself is sufficient; there is no confirmation dialog or second action.
+- A successful reservation enters a `pending` state, starts the standard three-second countdown, and makes the coordinate temporarily unavailable to other participants. The participant’s pending pixel pulses on the canvas and is labelled `YOUR PIXEL · PENDING`.
+- Other active reservations are rendered as smaller anonymous pulsing pixels. They never disclose identity, camera use, exact timer progress, form status, or completion method.
+- The participant sees the shared canvas throughout the countdown and challenge. On wide screens, the canvas is slightly zoomed out beside a challenge panel containing the timer, form-validation status, and compact local camera preview. On narrow screens, the canvas remains visible above a challenge panel or bottom sheet.
+- Camera-validated sessions display text such as `FORM VALIDATED · TIME COUNTING` only while valid time is being credited. Invalid-form and tracking-loss rules in section 8.2 continue to control the timer. Honor mode remains labelled `FORM NOT CAMERA-VALIDATED` and does not show a camera preview or form-valid state.
+- A successful challenge atomically records the completion, progression update, and permanent pixel at the reserved coordinate. The pending pulse stops and the pixel becomes fully locked without another participant action.
+- An incomplete or explicitly abandoned attempt releases the reservation and removes the pending pixel. Page exit, loss of reservation ownership, heartbeat expiry, challenge reset, or an unrecoverable session error also releases it. The participant may retry by selecting an available cell again.
+- Each active reservation has a server expiry and is renewed by a lightweight heartbeat while the attempt remains eligible. MVP defaults are a heartbeat every 10 seconds and expiry 30 seconds after the latest accepted heartbeat; these values are configuration, not client authority, and require load and background-behavior validation before the public pilot.
+- Heartbeats cannot extend a reservation beyond its absolute attempt deadline. The initial MVP deadline is the participant's target duration plus 180 seconds, capped at 300 seconds from reservation creation. Reaching the deadline releases the cell and ends the attempt; the public-pilot operating review may revise this configuration.
+- Each anonymous participant can hold at most one active reservation per challenge, and each coordinate can have at most one active reservation or permanent pixel. Server-side constraints and database functions enforce both rules.
+- If the reservation request collides with another reservation or committed pixel, the canvas refreshes that coordinate and asks the participant to select another available cell. A failed reservation does not start the countdown or consume the daily entitlement.
+- If completion reaches the server after the reservation has expired or been lost, the server does not write a pixel or progression update. The interface explains that the place was released and offers a retry; the client must never show a permanent pixel without authoritative confirmation.
+- After the target artwork has been filled, subsequent participants may reserve cells elsewhere on the canvas.
+- Previous daily canvases are read-only and accessible from an archive tab. Pending reservations are never written into archives.
 
 For pixels placed outside the target after its completion, MVP 1 uses one Leader-defined fallback color for the challenge, defaulting to the product accent orange. Participants cannot select or override this color. The Leader chooses it before publishing, it appears in the challenge preview, and it becomes immutable after the challenge's first pixel is placed.
 
@@ -251,7 +260,7 @@ MVP 1 uses one global challenge for the whole community, following the global da
 - The introduction is optional: `SKIP INTRO` is visible from the beginning, and `REPLAY INTRO` remains available from the menu.
 - Completing or skipping the introduction stores an `intro_seen_version` flag in the current browser profile. Clearing browser data can cause it to appear again.
 - The introduction never requests camera access and does not load TensorFlow.js.
-- The final scene transitions into today's canvas and its normal `START 30 SEC` action.
+- The final scene transitions into today's live canvas with the invitation `SELECT A PIXEL TO BEGIN`. Route selection, safety acknowledgment, and camera readiness occur before real cell selection is enabled.
 - The television scene uses an original runner-and-followers asset for MVP and the public pilot. Film footage, film-derived characters or scenes, soundtrack audio, logos, costume replication, and actor likenesses are excluded even if a licensing opportunity becomes available during MVP development.
 - Health-related captions must use evidence-reviewed, non-medical language and must not promise that one plank session treats or prevents disease.
 
@@ -261,29 +270,28 @@ MVP 1 uses one global challenge for the whole community, following the global da
 
 Before the standard daily journey, a first-time participant can view or skip the pixel-art introduction and can replay it later from the menu.
 
-1. View today’s challenge and current shared canvas.
+1. View today’s challenge, shared canvas, anonymous active-reservation count, and pulsing pending pixels.
 2. Receive a transparent anonymous browser identity without registration.
-3. See the required duration, local reset time, and basic local streak, and acknowledge the shared safety notice before entering a real camera or honor-mode session.
-4. Grant camera permission and receive local-only pose detection.
-5. Receive camera-placement guidance until the required landmarks are visible.
-6. Optionally enter the clearly labelled guided demo without camera access; simulated results remain isolated from real participant state.
-7. Alternatively choose the real honor mode without camera validation; it can consume the same daily completion and pixel entitlement as the camera flow.
-8. Start the timer once a valid plank is detected.
-9. See which form rule is failing and a five-second correction countdown.
-10. Stop crediting time immediately when required landmarks are lost, show `MOVE INTO FRAME` after the 500 ms UI debounce, or pause after visible incorrect form continues beyond the five-second grace period.
-11. Retry a failed or abandoned session.
-12. Complete one qualifying daily session.
-13. Return to the main canvas, where `PLACE YOUR PIXEL` replaces `START 30 SEC`.
-14. Choose an available canvas coordinate and place one earned pixel.
-15. See the selected cell become live and the disabled action change to `YOUR PIXEL IS LIVE`.
-16. See new community pixels without reloading the page.
-17. Browse previous read-only canvases.
+3. See the required duration, local reset time, and basic local streak.
+4. Choose camera validation or real honor mode and acknowledge the shared safety notice before entering a real challenge.
+5. For camera validation, grant permission, receive local-only pose detection, and follow framing guidance until the required landmarks are visible.
+6. Optionally enter the clearly labelled guided demo; simulated results and presence remain isolated from real participant state.
+7. Select an available canvas coordinate to atomically reserve it and trigger the three-second countdown. A collision asks the participant to choose another cell without consuming entitlement.
+8. See the selected pixel pulse as `YOUR PIXEL · PENDING` among smaller anonymous pending pixels.
+9. Keep the shared canvas visible beside or above the challenge timer, form-validation status, and compact local camera preview where applicable.
+10. Start crediting time after the countdown according to the selected route: valid detected form for camera mode or continuous active-page time for honor mode.
+11. See which camera form rule is failing and a five-second correction countdown.
+12. Stop crediting time immediately when required landmarks are lost, show `MOVE INTO FRAME` after the 500 ms UI debounce, or pause after visible incorrect form continues beyond the five-second grace period.
+13. Receive anonymous realtime reservation, release, and committed-pixel updates without reloading the page.
+14. Complete one qualifying daily session and see the pending pixel atomically become a permanent locked contribution with no second placement action.
+15. On failure, abandonment, expiry, or loss of reservation ownership, see the pending pixel disappear and retry by selecting an available cell.
+16. Browse previous read-only canvases.
 
 ### Responsive and browser experience
 
 1. Use the full participant flow on phone, tablet, laptop, or desktop layouts.
 2. Support current evergreen Chrome, Edge, Firefox, and Safari on desktop and mobile where the required camera, WebAssembly, and browser APIs are available.
-3. Provide touch, pointer, and keyboard interaction for canvas placement and navigation.
+3. Provide touch, pointer, and keyboard interaction for canvas reservation and navigation.
 4. Detect unsupported capabilities before the session starts and explain the exact missing requirement.
 5. Preserve canvas viewing, archives, informational pages, and the isolated guided demo even when pose tracking is unavailable.
 6. Require a secure HTTPS context for deployed camera use.
@@ -298,7 +306,7 @@ Before the standard daily journey, a first-time participant can view or skip the
 4. Preview the low-opacity canvas target.
 5. Publish or schedule the challenge.
 
-Live-presence animation is excluded from MVP 1. Realtime is used for completed pixel placements only.
+Anonymous live-presence synchronization is included in MVP 1. It covers pending reservations, releases, committed pixels, reconnect reconciliation, and an aggregate active count. It never transmits identity, camera data, pose data, personal timers, form results, or completion method.
 
 ## 10. Explicitly out of scope for MVP 1
 
@@ -312,7 +320,7 @@ Live-presence animation is excluded from MVP 1. Realtime is used for completed p
 - A long-form cinematic intro with voice-over, complex character animation, or photorealistic video. MVP 1 is a concise pixel-art sequence built from reusable sprites and transitions.
 - Cross-device streak synchronization.
 - Strong proof that a client-reported session was genuinely completed.
-- Live pulsing or visualization of users who are currently planking.
+- Named participant presence, profiles, avatars, public personal timers, rankings, chat, reactions, and any sharing of individual form or camera state.
 - Scope not expressly accepted in this PRD.
 
 </details>
@@ -358,30 +366,34 @@ The production system contains no Python pose service. If the AI/ML team uses Py
 - Use `@tensorflow-models/pose-detection` with TensorFlow.js in the browser.
 - Use MoveNet `SINGLEPOSE_LIGHTNING` for MVP 1 because only one participant is expected and latency is more important than multi-person detection.
 - Register the TensorFlow.js WebGL backend as the default and keep the WASM backend as a compatibility fallback.
-- Load TensorFlow.js, the backend, and the model only on the session route; do not include them in the main-page bundle.
+- Load TensorFlow.js, the backend, and the model only after the participant chooses camera validation and begins camera setup; do not include them in the initial canvas bundle.
 - Enable MoveNet temporal smoothing and establish explicit minimum keypoint-confidence thresholds through device testing.
 - Throttle inference to the rate required for stable feedback rather than processing every camera frame. Start testing around 20–30 inferences per second and reduce the rate on slower devices.
 - Consider a Web Worker only after measuring the target browsers; worker transfer and camera-frame plumbing are not required for the first implementation.
 - Calculate joint angles, visibility checks, smoothing, the form state machine, and the session timer entirely in the browser.
 - Do not transmit raw frames, screenshots, landmarks, or per-frame angles in MVP 1.
-- Send only the final business event needed to claim a completion, such as challenge ID, anonymous user ID from the access token, target duration, completion timestamp, completion method, and the active pose-rule configuration version when camera validation was used.
-- Dispose of the detector and TensorFlow tensors, stop camera tracks, and release associated resources when the session route is left.
-- Suspend or destroy the PixiJS renderer while the TensorFlow session is active so both systems do not compete unnecessarily for WebGL contexts, GPU memory, and battery.
+- Send only the business events needed to maintain the reservation and claim completion: reservation ID, challenge ID, anonymous user ID from the access token, target duration, completion timestamp, completion method, and the active pose-rule configuration version when camera validation was used.
+- Dispose of the detector and TensorFlow tensors, stop camera tracks, and release associated resources when the challenge ends or the participant leaves the active experience.
+- Keep the shared PixiJS canvas visible during an active camera session, but reduce its cost: zoom out to a stable viewport, stop continuous camera motion, render only presence or pixel changes, cap animation frequency, and avoid expensive filters. Measure simultaneous TensorFlow.js and PixiJS GPU use on the supported device matrix; if the device cannot sustain both, degrade the canvas to a Canvas 2D or server-rendered snapshot while keeping the timer and form validation functional.
 
 ### 11.3 Data, identity, and realtime updates
 
 - Use Supabase Auth anonymous sign-ins. This requires no PII or registration while providing a stable UUID, an authenticated database role, RLS, and a future path to link a permanent identity.
 - Use Postgres as the source of truth for challenges, artworks, anonymous progression, completions, and placed pixels.
 - Enable Row Level Security on every exposed table.
-- Enforce one completion and one pixel entitlement per anonymous user and challenge with database uniqueness constraints, not only UI checks.
+- Enforce one completion, one permanent pixel, and at most one active reservation per anonymous user and challenge with database uniqueness constraints, not only UI checks.
 - Store uploaded source artwork in Supabase Storage.
-- Use database functions/RPCs for completion claims and pixel placement so entitlement consumption, collision checks, and pixel insertion occur atomically.
-- Load an initial canvas snapshot over the Supabase Data API, then subscribe to a private, challenge-specific Supabase Realtime Broadcast channel for new pixel placements.
+- Use database functions/RPCs for reservation creation, heartbeat renewal, release, and completion. Reservation creation atomically checks the coordinate and participant constraints. Completion atomically verifies reservation ownership and expiry, records the completion and progression, and converts the reserved coordinate into a permanent pixel.
+- Store active reservations separately from permanent pixels, or model them with an equivalent state machine that supports authoritative `pending`, `committed`, `released`, and `expired` transitions. Coordinate exclusivity must be enforced by a single occupancy relation or by transaction-level locking and server-side checks that cover both reservations and permanent pixels; separate client checks are insufficient.
+- Use server time for reservation expiry. The initial MVP configuration sends a heartbeat every 10 seconds and extends a valid reservation to 30 seconds after the accepted heartbeat. Cleanup may be lazy during reads/writes plus a scheduled sweep; expired reservations must be treated as available even before physical deletion.
+- Store an immutable server-calculated absolute deadline with every reservation. Heartbeat renewal uses the earlier of `server_now + heartbeat_ttl` and that deadline, so a connected but stalled client cannot hold a cell indefinitely.
+- Load an initial canvas and active-reservation snapshot over the Supabase Data API, then subscribe to a private, challenge-specific Supabase Realtime Broadcast channel for reservation, release, expiry, and committed-pixel events.
 - Treat Postgres as authoritative after reconnect: refetch changes or the current viewport instead of assuming that every realtime event was received.
-- Emit authoritative placement events from the database only after the atomic placement transaction succeeds. Participant clients must not be able to publish authoritative pixel events.
+- Emit authoritative reservation and pixel lifecycle events from trusted database functions or server code only after the corresponding transaction succeeds. Participant clients must not be able to publish authoritative lifecycle events directly.
 - Authorize private Broadcast subscriptions with RLS policies on `realtime.messages`, scoped to the challenge topic.
-- Broadcast compact pixel events containing only challenge ID, integer coordinates, color, and server timestamp.
-- Do not use Presence in MVP 1.
+- Broadcast compact lifecycle events containing only challenge ID, integer coordinates, color, anonymous state (`pending`, `committed`, or `released`), reservation expiry when applicable, and server timestamp. Do not include owner ID, reservation secret, completion method, form state, personal timer, or camera state.
+- Product live presence is derived from authoritative active reservations and lifecycle Broadcast events. Supabase Presence may be used only for anonymous connection health or aggregate diagnostics; it is never authoritative for coordinate ownership, completion, or the displayed active-reservation count.
+- On reconnect, refetch authoritative active reservations and permanent pixels before replaying new events. Remove locally pulsing pixels that are absent or expired in the snapshot and restore an owned reservation only when the server confirms ownership and validity.
 
 ### 11.4 Artwork rendering
 
@@ -391,7 +403,7 @@ Rationale:
 
 - PixiJS uses GPU-accelerated WebGL/WebGL2 in production and batches simple sprites/graphics efficiently.
 - pixi-viewport v6 supports PixiJS v8 and supplies mouse drag, touch drag, pinch zoom, wheel zoom, and deceleration.
-- The retained scene graph supports the target outline, completed pixels, selection cursor, and short realtime animations without building a full editor.
+- The retained scene graph supports the target outline, completed pixels, selectable coordinates, the participant's pending pixel, anonymous pending pixels, and short realtime lifecycle animations without building a full editor.
 - Konva is better suited to manipulating many independent editable shapes; that scene-graph overhead is not needed because MVP participants select one logical grid coordinate rather than edit artwork objects.
 - A hand-written Canvas 2D implementation would minimize dependencies but would require the team to build and maintain zoom, pan, transforms, pointer mapping, culling, and interaction behavior before validating the core product.
 
@@ -401,21 +413,21 @@ Implementation requirements:
 - Use PixiJS’s stable WebGL renderer for MVP 1. Do not enable WebGPU in production while its cross-browser behavior remains experimental.
 - Configure `antialias: false`, align transforms to device pixels, and use integer world coordinates so square cells remain crisp.
 - Use pixi-viewport for drag, pinch, wheel, and deceleration, but clamp zoom to readable and selectable cell sizes.
-- Organize the scene into target-outline, completed-pixel, placement-preview, and transient-animation layers.
+- Organize the scene into target-outline, completed-pixel, available-cell interaction, anonymous-pending, owned-pending, and transient-animation layers. The owned pending pixel must remain visually distinct without relying on color alone.
 - Batch cells by state/color instead of creating an interactive event target for every square.
-- Convert the pointer's world position mathematically into integer grid coordinates. Validate availability against local state, then submit the selected coordinate atomically to Supabase without an intermediate confirmation dialog.
-- Store pixels as integer `x`, `y`, `color`, `challenge_id`, and anonymous `owner_id` values, with private soft-removal metadata for moderation.
-- Enforce uniqueness for active pixels on `(challenge_id, x, y)` so overwriting is impossible while a soft-removed coordinate can be claimed again.
+- Convert the pointer's world position mathematically into integer grid coordinates. Validate apparent availability against local state, then atomically request a reservation from Supabase without an intermediate confirmation dialog. Only server confirmation starts the countdown and pending animation.
+- Store permanent pixels as integer `x`, `y`, `color`, `challenge_id`, and private anonymous `owner_id` values, with private soft-removal metadata for moderation. Store reservations with an unguessable ID, owner, coordinate, server expiry, heartbeat timestamp, and attempt state; never expose owner or reservation credentials publicly.
+- Enforce coordinate exclusivity across permanent pixels and non-expired reservations on `(challenge_id, x, y)` through the authoritative occupancy transaction so overwriting is impossible while a released, expired, or soft-removed coordinate can be claimed again.
 - Perform Leader moderation through an authorized database function that atomically soft-removes the pixel, records the moderator, reason, and timestamp, and emits an authoritative removal event. Removal never restores or creates a participant entitlement.
 - Partition large canvases into logical chunks and fetch/render only chunks intersecting the current viewport.
 - Enable PixiJS culling or equivalent application-level chunk culling when substantial content lies offscreen.
-- Stop the PixiJS ticker and render on demand while the canvas is static. Temporarily animate only new-pixel and completion effects to reduce battery use.
+- Stop the PixiJS ticker and render on demand while the canvas is static. During live presence, animate only visible pending pixels and lifecycle transitions, cap their update rate, and stop or simplify offscreen animation to reduce battery use.
 - Destroy the PixiJS application, viewport listeners, textures, and subscriptions when the component unmounts.
 
 Compatibility and accessibility:
 
-- If WebGL initialization fails, provide a non-interactive Canvas 2D or server-generated image snapshot so the artwork and archives remain viewable. Pixel placement may be disabled with a clear capability message in this fallback.
-- Canvas content is not inherently accessible. Mirror the important state in DOM text, expose completion counts and focused coordinates to assistive technology, and provide keyboard controls for moving the placement cursor and directly placing at the focused cell.
+- If WebGL initialization fails, provide a Canvas 2D or server-generated image snapshot so the artwork and archives remain viewable. If the fallback cannot provide precise accessible coordinate selection, real reservation is disabled with a clear capability message while honor mode and guided demo availability follow their separate capability rules.
+- Canvas content is not inherently accessible. Mirror the important state in DOM text, expose committed and anonymous-active counts plus the focused coordinate to assistive technology, and provide keyboard controls for moving the reservation cursor and selecting the focused cell. Announce owned reservation, completion, release, and collision outcomes; do not announce every anonymous pulse or create a stream of disruptive live-region messages.
 
 ### 11.5 Hosting
 
@@ -432,6 +444,9 @@ Compatibility and accessibility:
 - Server constraints can prevent ordinary duplicate claims but cannot cryptographically prove correct form without adding a trusted execution or server-verification model.
 - Anonymous sign-in endpoints require abuse protection and rate limiting before a public launch.
 - Pixel owner identifiers and moderation audit records remain private to authorized Leaders and are excluded from public canvas, archive, and realtime payloads.
+- Reservation owner IDs, session secrets, heartbeat credentials, exact personal progress, form status, and completion method remain private and are excluded from public canvas and realtime payloads.
+- Rate-limit reservation creation and heartbeat renewal, bind them to the authenticated anonymous participant and challenge, reject renewals for released or expired reservations, and prevent one client from reserving multiple coordinates.
+- Live participant counts are approximate anonymous product state, not claims about verified people or correct form. Never use them for rankings, pressure, or prizes.
 - Analytics collection is disabled by default. A future pilot must present a clear accept/decline choice before emitting any non-essential event, honor withdrawal prospectively, and test that declining has no functional effect.
 - Future analytics use an explicit event allow-list and a maximum 30-day raw-event retention policy. Camera and pose data, health information, free text, and stable fingerprinting identifiers are prohibited fields.
 - Fitness guidance must include an appropriate safety notice and avoid medical claims.
@@ -443,12 +458,12 @@ Compatibility and accessibility:
 - Camera permission friction may sharply reduce challenge starts.
 - Canvas mechanics may fail if participation and artwork size are poorly matched.
 - Authentication and anti-abuse requirements may expand MVP scope substantially if not minimized.
-- “Live” presence introduces real-time infrastructure and privacy questions that may not justify MVP complexity.
+- Live reservation synchronization introduces concurrency, expiry, reconnect, privacy, operating-cost, and animation-load risks. It requires an authoritative server lifecycle, load testing, bounded payloads, and graceful degradation rather than client-only presence indicators.
 - Hips, knees, and head position cannot all be judged from arbitrary angles or when their required landmarks are outside the frame.
 - An unbounded canvas needs collision rules and a viewport strategy even if participant capacity is unlimited.
 - Progression beyond 120 seconds could expose participants to targets that are unsafe, impractical, or impossible for them; it remains disabled unless a later safety review approves a higher ceiling, validates the guidance, and authorizes release.
 - Browser-only identity means streak loss is expected when site storage is cleared or a different device is used.
-- TensorFlow.js and PixiJS both use GPU resources; their lifecycles must not overlap unnecessarily on constrained devices.
+- TensorFlow.js and PixiJS both use GPU resources. The new side-by-side active experience intentionally overlaps them, so the canvas must render on demand, animate sparingly, and degrade to a lighter snapshot when the supported device cannot sustain both.
 - A PixiJS/WebGL canvas requires a DOM accessibility layer and a view-only fallback when GPU initialization is unavailable.
 - A mandatory or lengthy introduction can delay the core action and reduce first-session conversion; it must be immediately skippable and measured separately from challenge starts.
 - Film-derived imagery creates intellectual-property, brand, schedule, and maintenance risk. MVP and the public pilot use only the original runner-and-followers scene; any later licensing initiative requires a separate scope and review.
@@ -477,39 +492,43 @@ The supplied concept establishes the preferred visual language:
 
 The design should preserve this restraint. New features should appear as light overlays, edge controls, compact status strips, or temporary bottom sheets rather than a dashboard of opaque cards.
 
+The current interaction reference is the [pixel-first challenge with anonymous live presence](../slides/designs/pixel-first-challenge.html).
+
 ### 14.2 Proposed adaptation A — Canvas Monument
 
 Use the supplied composition as the home screen almost unchanged. The shared artwork remains the dominant object. Add:
 
 - A compact top status row containing current target, streak, and local reset countdown.
 - A small archive/menu control in the top-right corner.
-- A bottom-centered primary action: `START 30 SEC` before completion, `PLACE YOUR PIXEL` after completion, or disabled `YOUR PIXEL IS LIVE` after placement.
-- A subtle completion count beneath the canvas.
+- An up-front prompt: `SELECT A PIXEL TO BEGIN`. Available cells are pointer-, touch-, and keyboard-selectable after route, safety, and readiness requirements are satisfied.
+- A subtle committed count and anonymous `PLANKING NOW` count near the canvas.
 
 Best for emotional impact and fidelity to the supplied design. Less information is immediately visible, so secondary features live in sheets or the menu.
 
 ### 14.3 Proposed adaptation B — Ritual Split
 
-On wide screens, place the artwork in roughly two-thirds of the viewport and a narrow ritual rail in the remaining third. The rail contains target duration, streak, reset countdown, privacy note, and the primary action. On mobile, the rail becomes a bottom sheet beneath the canvas.
+On wide screens, keep the slightly zoomed-out shared artwork in roughly two-thirds of the active viewport and place a narrow challenge rail in the remaining third. During the challenge, the rail contains the credited timer, textual form-validation state, compact local camera preview, privacy note, and session-exit control. The participant's larger labelled pulse and smaller anonymous pulses remain visible on the artwork. On mobile, the canvas stays visible above the rail, which becomes a bottom sheet beneath it.
 
 Best balance of clarity and visual character. This is the recommended production direction because it scales cleanly from desktop to mobile without covering the art.
 
-### 14.4 Proposed adaptation C — Immersive Session
+### 14.4 Proposed adaptation C — Shared active session
 
-During exercise, replace the canvas with the local camera view while retaining the same background, pixel vocabulary, and Pixelify Sans typography. Show:
+During exercise, retain the shared canvas and open the challenge rail beside or below it. Show:
 
 - A large pixel timer.
-- A thin landmark skeleton or joint markers.
+- A compact local camera preview with a thin landmark skeleton or joint markers.
 - The current state: `GET IN FRAME`, `PERFECT FORM`, `FIX HIPS`, `STRAIGHTEN KNEES`, `LIFT HEAD`, or `PAUSED`.
 - A five-cell grace indicator that empties once per invalid second.
 - A persistent local-processing badge.
+- The participant's labelled pending pixel and anonymous active reservations pulsing on the shared canvas.
 
-After completion, morph the timer cells into the participant’s earned pixel and transition directly into placement mode.
+After completion, stop the participant's pulse and lock the reserved coordinate as a permanent pixel. If the attempt ends without completion, remove the pulse and reopen the coordinate.
 
 ### 14.5 Supporting screens
 
-- **Camera setup:** illustrated framing guide, permission explanation, device-local privacy promise, and readiness checks.
-- **Pixel placement:** zoomed target, up-front immediate-placement notice, earned pixel attached to the pointer or focused keyboard cell, automatic target color, occupied-cell feedback, direct click/tap/keyboard placement, submitting state, and realtime celebration. No placement confirmation dialog is shown.
+- **Camera setup:** illustrated framing guide, permission explanation, device-local privacy promise, readiness checks, and transition back to an enabled canvas-selection state.
+- **Pixel reservation:** available-cell focus and hover, up-front `SELECTING A CELL STARTS THE CHALLENGE` notice, artwork or fallback color preview, occupied/reserved-cell feedback, direct click/tap/keyboard reservation, collision recovery, and countdown transition. No confirmation dialog is shown.
+- **Live challenge:** zoomed-out shared canvas, owned and anonymous pending pulses, anonymous active count, credited timer, form-validation status, compact on-device camera preview, reconnect state, and automatic commit or release outcome.
 - **Archive:** date-grouped thumbnail grid using the same outlined-pixel treatment; selecting a day opens a read-only canvas.
 - **Leader:** restrained utility layout for magic-link access, 64 × 64 upload/preview, date, challenge settings, validation errors, and publish state.
 - **Unsupported device:** capability checklist with viewing/archive access preserved.
@@ -518,8 +537,8 @@ After completion, morph the timer cells into the participant’s earned pixel an
 
 - Coral and pale outline colors must meet appropriate contrast when they communicate status; color alone cannot indicate valid or invalid form.
 - All form feedback must have text and optional audio/haptic equivalents where supported.
-- Respect reduced-motion preferences for pixel pulses, transitions, and completion effects.
-- Provide keyboard-operable pixel placement and visible focus treatment.
+- Respect reduced-motion preferences for pixel pulses, transitions, and completion effects. Reduced motion replaces repeated pulse animation with a static pending outline and text label while preserving the state distinction.
+- Provide keyboard-operable pixel reservation and visible focus treatment.
 - Offer a mirrored camera preview without mirroring pose-coordinate calculations incorrectly.
 - Keep controls reachable and labels readable at mobile sizes and high zoom.
 
@@ -527,14 +546,14 @@ After completion, morph the timer cells into the participant’s earned pixel an
 
 The MVP’s principal journey should read as one continuous ritual:
 
-1. **Today’s canvas:** the participant arrives on a desktop main page dominated by the partially completed `PLANK AS ONE` artwork. Filled coral squares show community contributions and pale outlined squares show remaining targets. The page also shows a seven-day streak, local reset countdown, archive/menu access, and `START 30 SEC`. It does not show `PERFECT FORM` at the top.
-2. **Ready position:** after selecting `START 30 SEC`, the participant sees the local camera area represented in the design as a pixel-art person and framing guide. The interface waits until the required landmarks are visible and the participant is ready to enter a plank.
-3. **Three-second countdown:** once readiness is confirmed, the interface shows a clear `3`, `2`, `1` countdown with optional sound. The timer has not started yet.
-4. **Active plank:** the participant is shown in a pixel-art plank pose with local pose landmarks and a `00:00 / 00:30` progress timer. Form states and the five-second grace indicator appear here when needed.
-5. **Earned pixel on the main page:** after 30 valid seconds, the participant returns to the same main page. `START 30 SEC` has been replaced by the active `PLACE YOUR PIXEL` button. Selecting it enables placement mode and shows that choosing a cell places the pixel immediately. Clicking, tapping, or keyboard-activating an unoccupied outlined target directly submits the placement with no confirmation step. The pixel automatically takes that target coordinate's artwork color.
-6. **Pixel live:** after the placement transaction succeeds, the selected cell is filled and visible on the shared canvas. The primary button becomes disabled and reads `YOUR PIXEL IS LIVE`. The participant cannot place another pixel or restart the daily session until the next UTC challenge.
+1. **Today’s live canvas:** the participant arrives on a desktop main page dominated by the partially completed `PLANK AS ONE` artwork. Filled squares show permanent contributions, pale outlined squares show available targets, and small anonymous pulses show current reservations. The page also shows streak, target, local reset countdown, archive/menu access, `PLANKING NOW`, and `SELECT A PIXEL TO BEGIN`. It does not show `PERFECT FORM` at the top.
+2. **Route, safety, and readiness:** the participant chooses camera validation or honor mode and acknowledges the safety notice. Camera participants grant permission and complete framing guidance before the canvas becomes selectable; honor participants receive the keep-this-page-open warning. Guided demo remains isolated.
+3. **Reserve and countdown:** selecting an available cell atomically reserves it and immediately triggers the clear `3`, `2`, `1` countdown. The selected cell becomes a larger labelled `YOUR PIXEL · PENDING` pulse. A collision refreshes the cell and returns focus to canvas selection.
+4. **Active shared plank:** the shared canvas remains visible and slightly zoomed out. On desktop, a challenge rail sits beside it; on mobile, the canvas stays above the rail. The rail shows `00:00 / 00:30`, form state such as `FORM VALIDATED · TIME COUNTING`, a compact on-device camera preview where applicable, and correction or tracking-loss states. Anonymous pending pixels continue pulsing on the canvas.
+5. **Automatic commit:** after the required credited time, one atomic server transaction records completion and progression and converts the owned reservation into a permanent pixel. The pulse stops, the camera closes, and the interface announces `YOUR PIXEL IS LIVE`. No placement screen or second click occurs.
+6. **Automatic release:** if the attempt is abandoned, fails, expires, loses reservation ownership, or encounters an unrecoverable error, the pending pixel fades out, the coordinate becomes available, and the participant may retry by selecting a cell again.
 
-Transitions should visually connect the stages: the start button becomes the countdown, the countdown becomes the timer, and the completed timer resolves into the earned pixel.
+Transitions should visually connect the stages: cell selection becomes the countdown, the pending pulse persists through the timer, success turns the pulse solid, and failure removes it.
 
 ### 14.8 First-visit pixel-art introduction
 
@@ -550,7 +569,7 @@ The introduction explains the product emotionally before it explains it function
 4. **Effort becomes company:** square pixels fall from above, gather around them, and assemble into other people holding planks. Each figure should form from the same cell language used by the shared artwork.
 5. **Benefits appear:** as the camera pulls upward, short evidence-reviewed captions appear between the growing groups. Captions remain secondary to the story and never interrupt scrolling.
 6. **The collective image:** the camera continues to zoom out until the protagonist and the surrounding participants resolve into the pixel letterforms `PLANK AS ONE`.
-7. **Invitation:** one final empty cell pulses in the artwork. The copy reads `ONE PLANK. ONE PIXEL. ONE CANVAS.` and transitions to today's main page with `START 30 SEC`.
+7. **Invitation:** one final empty cell pulses in the artwork. The copy reads `ONE PLANK. ONE PIXEL. ONE CANVAS.` and transitions to today's main page with `SELECT A PIXEL TO BEGIN` after the participant completes the required route, safety, and readiness steps.
 
 The sequence must remain understandable without sound and uses no voice-over. If audio is implemented, use original ambient/chiptune music with simple sound effects, muted by default, and provide a persistent sound toggle. Audio remains optional and cannot block or delay the core introduction.
 
@@ -626,7 +645,7 @@ Recommended setup:
 - Use `@storybook/sveltekit` inside `apps/web` and keep Storybook configuration in `apps/web/.storybook`.
 - Keep reusable, typed fixtures in `apps/web/src/lib/mocks`. Fixtures must conform to the same TypeScript interfaces used by production repositories and stores.
 - Put Supabase, realtime, browser identity, clock, camera, and pose detection behind small injected interfaces. Stories replace these interfaces with deterministic fakes rather than importing or mocking Supabase internals.
-- Use Mock Service Worker only where a component genuinely performs an HTTP request, such as artwork loading. Prefer injected fake repositories for application state and a controllable fake realtime client for pixel events.
+- Use Mock Service Worker only where a component genuinely performs an HTTP request, such as artwork loading. Prefer injected fake repositories for application state and a controllable fake realtime client for reservation and pixel lifecycle events.
 - Use a fake clock and fixed UTC challenge timestamps so reset countdown, streak, archive date, and midnight rollover stories do not depend on the developer's current time or timezone.
 - Use a fake pose adapter that emits scripted landmark visibility and form states. TensorFlow.js and the real camera must not run in ordinary component stories.
 - Add Storybook controls for useful state transitions, but keep named stories for every acceptance-critical state so they can run deterministically in CI.
@@ -638,39 +657,39 @@ At minimum, Storybook must expose the following desktop states before backend in
 | Area | Required stories |
 | --- | --- |
 | First-visit intro | Each of the seven static chapters, first visit, returning visit bypass, skip, replay, completed transition, muted audio, reduced motion, narrow viewport, asset failure, and WebGL fallback. |
-| Today's canvas | Loading, load failure with retry, partial artwork with `START 30 SEC`, completed session with `PLACE YOUR PIXEL`, placed pixel with disabled `YOUR PIXEL IS LIVE`, fully completed target with placement outside the artwork, reset imminent, and disconnected/reconnecting. |
+| Today's canvas | Loading, load failure with retry, partial artwork with `SELECT A PIXEL TO BEGIN`, anonymous live count, multiple pending pulses, reduced-motion pending state, fully completed target with selection outside the artwork, reset imminent, disconnected/reconnecting, and authoritative snapshot reconciliation. |
 | Camera setup | Shared safety notice, acknowledged notice, same-day retry bypass, new UTC day, changed safety-copy version, permission explanation, permission denied, unsupported camera, model loading, model failure, move into frame, insufficient visible landmarks, and ready. |
 | Countdown | `3`, `2`, `1`, cancelled because the pose was lost, and transition to the active timer. |
-| Active plank | Valid form, hips too high, hips too low, bent knees, incorrect head position, each second of the five-second grace period, brief tracking loss recovered inside 500 ms, persistent tracking loss with `MOVE INTO FRAME`, paused timer, recovered form, abandoned session, and completion. |
-| Guided demo | Entry from camera setup, permission denied, unsupported camera, persistent simulated-data label, scripted valid and invalid form, isolated completion, isolated pixel placement, and exit to real participant state. |
-| Honor mode | Shared safety notice, entry without camera, persistent `FORM NOT CAMERA-VALIDATED` label, countdown, continuous timer with no pause control, `END SESSION`, tab switch, browser background, device lock, navigation away, ended-session message, retry, automatic completion, shared-entitlement conflict, earned pixel, and return to camera setup. |
-| Pixel placement | Placement available with immediate-placement notice, pointer/focused-keyboard preview, occupied target, direct selection, submitting without a confirmation dialog, collision conflict, network failure with retry and preserved entitlement, successful placement, and a remote realtime pixel arriving. |
+| Active plank | Zoomed-out canvas beside the challenge rail, owned and anonymous pending pulses, compact camera preview, valid form with `FORM VALIDATED · TIME COUNTING`, hips too high, hips too low, bent knees, incorrect head position, each second of the five-second grace period, brief tracking loss recovered inside 500 ms, persistent tracking loss with `MOVE INTO FRAME`, paused timer, recovered form, reservation heartbeat, abandoned session, automatic release, and automatic commit. |
+| Guided demo | Entry from camera setup, permission denied, unsupported camera, persistent simulated-data label, scripted valid and invalid form, isolated reservation, isolated completion or release, and exit to real participant state. |
+| Honor mode | Shared safety notice, entry without camera, persistent `FORM NOT CAMERA-VALIDATED` label, cell reservation, countdown, continuous timer with no pause control, owned pending pulse, `END SESSION`, tab switch, browser background, device lock, navigation away, release message, retry, automatic commit, shared-entitlement conflict, and return to camera setup. |
+| Pixel reservation and presence | Reservation available with up-front start notice, pointer/focused-keyboard preview, occupied or remotely reserved target, direct selection without confirmation, submitting, collision conflict, one-reservation-per-participant conflict, heartbeat accepted or rejected, expiry, explicit release, reconnect with owned reservation restored, reconnect after expiry, duplicate/delayed/out-of-order lifecycle events, anonymous peer join/complete/release, successful atomic commit, and remote permanent pixel arrival. |
 | Archive | Loading, empty archive, populated archive, selected historical canvas, and load failure. |
 | Leader | Signed out, upload idle, invalid image, valid 64 x 64 preview, challenge settings, validation failure, publishing, published, pixel selected for moderation, removal confirmation, missing reason, removal failure, and removal success. |
 | Shared UI | Menu open, reduced motion, keyboard focus, long translated copy tolerance, narrow viewport, and WebGL artwork fallback. |
 
-The six primary desktop journey stories listed in section 14.7 are the first review milestone and should match the approved presentation: today's canvas, ready position, countdown, active plank, earned pixel, and pixel live.
+The six primary desktop journey stories listed in section 14.7 are the first review milestone: today's live canvas, route/safety/readiness, reserve/countdown, active shared plank, automatic commit, and automatic release.
 
 ### 15.3 Automated frontend tests
 
 Storybook is the primary component and screen-state harness, but it is one layer of the test strategy:
 
 - **Static checks:** TypeScript checking, Svelte checking, formatting, and linting.
-- **Unit tests:** Vitest tests for first-visit/replay routing, scroll-progress timeline mapping, countdown logic, UTC challenge-day and versioned safety-acknowledgment calculations, duration progression, honor-mode continuous timing and page-visibility abandonment, form-grace state machine, tracking-loss debounce, canvas coordinate conversion, and UI reducers/stores. If analytics are introduced for a later pilot, add consent, withdrawal, event allow-list, and prohibited-field tests before enabling collection.
-- **Story tests:** Storybook's Vitest integration runs render and interaction tests against acceptance-critical stories. Test keyboard and pointer flows for starting, cancelling, retrying, and direct pixel placement, including the absence of a second confirmation action.
+- **Unit tests:** Vitest tests for first-visit/replay routing, scroll-progress timeline mapping, countdown logic, UTC challenge-day and versioned safety-acknowledgment calculations, duration progression, honor-mode continuous timing and page-visibility abandonment, form-grace state machine, tracking-loss debounce, canvas coordinate conversion, reservation lifecycle reducers, heartbeat, rolling expiry and absolute-deadline calculations, reconnect reconciliation, idempotent realtime-event handling, and UI stores. If analytics are introduced for a later pilot, add consent, withdrawal, event allow-list, and prohibited-field tests before enabling collection.
+- **Story tests:** Storybook's Vitest integration runs render and interaction tests against acceptance-critical stories. Test keyboard and pointer flows for route preparation, direct cell reservation, countdown, cancellation, retry, collision recovery, automatic commit, and automatic release, including the absence of a start button, placement screen, or second confirmation action.
 - **Accessibility checks:** Run Storybook accessibility checks on all primary stories. Critical violations fail CI.
-- **Visual regression:** Capture stable desktop snapshots for the six primary journey states. Dynamic timestamps, animation, random pixel locations, and realtime events must be frozen for deterministic comparisons.
-- **End-to-end tests:** Keep a small Playwright suite for the integrated camera happy path, the real honor-mode happy path and page-hide abandonment, the isolated guided-demo happy path, Leader soft removal, and critical failures against a local or preview Supabase environment. Assert that camera and honor modes share one entitlement, demo completion and placement never mutate real participant or canvas state, and moderation reopens the coordinate without restoring the removed participant's entitlement. Do not duplicate the entire Storybook state matrix in E2E tests.
+- **Visual regression:** Capture stable desktop snapshots for the six primary journey states, including the side-by-side active canvas and challenge rail. Dynamic timestamps, pulse phase, random coordinates, live counts, and realtime events must be frozen for deterministic comparisons.
+- **End-to-end tests:** Keep a small Playwright suite for the integrated camera reserve-to-commit happy path, the real honor-mode reserve-to-commit path and page-hide release, collision between two anonymous participants, heartbeat expiry and reconnect, the isolated guided-demo happy path, Leader soft removal, and critical failures against a local or preview Supabase environment. Assert that camera and honor modes share one entitlement, demo reservation and completion never mutate real participant or canvas state, released or expired reservations never become permanent pixels, and moderation reopens the coordinate without restoring the removed participant's entitlement. Do not duplicate the entire Storybook state matrix in E2E tests.
 - **Pose-engine tests:** Test form classification, the five-second grace state machine, and immediate time exclusion plus the 500 ms tracking-loss debounce separately with recorded landmark fixtures. Manual camera/device testing remains required because mocked stories cannot validate real pose-estimation accuracy.
 
 ### 15.4 Integration contracts and mock-data rules
 
 - Frontend mocks must be derived from documented domain types, not ad hoc shapes created inside individual stories.
 - Completion contracts and fixtures include `completion_method` and, for camera-validated sessions, the pose-rule configuration version, but no landmarks, angles, per-frame classifications, or camera data.
-- The frontend and backend teams must agree early on challenge, artwork, completion, placement, archive, and realtime-event contracts. Contract changes update production types, fixtures, and affected stories in the same pull request.
+- The frontend and backend teams must agree early on challenge, artwork, reservation, heartbeat, release, completion/commit, archive, and realtime lifecycle contracts. Contract changes update production types, fixtures, and affected stories in the same pull request.
 - Fixture builders must provide sensible defaults and accept explicit overrides, making edge cases readable without duplicating large data objects.
 - Story data must contain no real camera frames, personal information, Supabase credentials, or production URLs.
-- Realtime stories must replay explicit events and support duplicate, delayed, conflicting, and out-of-order pixel updates.
+- Realtime stories must replay explicit reservation, renewal, release, expiry, commit, and permanent-pixel events and support duplicate, delayed, conflicting, and out-of-order updates.
 - A story must never require a running backend unless it is clearly labelled as an integration story and excluded from the deterministic component-test job.
 
 ### 15.5 MVP 1 test gates
@@ -681,9 +700,10 @@ A frontend feature is ready for integration when its required stories exist, acc
 - First-visit, skip, replay, reduced-motion, asset-failure, and returning-user intro stories pass.
 - All primary journey stories pass interaction and accessibility checks.
 - Visual baselines for the intro's key chapters and the six desktop journey states have been reviewed by the team.
-- Unit tests cover UTC reset, progression, grace timing, placement entitlement, and collision handling.
+- Unit tests cover UTC reset, progression, grace timing, reservation ownership, heartbeat expiry, atomic completion/commit, one-reservation constraints, reconnect reconciliation, and collision handling.
 - The integrated Playwright happy path passes against the preview environment.
-- Manual tests cover the supported browser/device matrix, actual camera permissions, pose accuracy, WebGL fallback, reconnect behavior, and UTC rollover.
+- Manual tests cover the supported browser/device matrix, actual camera permissions, pose accuracy, simultaneous TensorFlow.js and canvas performance, lighter-canvas fallback, reduced motion, realtime reconnect behavior, reservation expiry, and UTC rollover.
+- Reservation concurrency tests prove coordinate exclusivity, one-reservation-per-participant, absolute-deadline enforcement, authoritative reconnect convergence, and the two-second p95 lifecycle-visibility objective under the approved pilot load.
 - No test or story transmits camera frames or pose streams outside the browser.
 - Build Week builds emit no non-essential analytics, and future-pilot analytics tests prove that no event is emitted before opt-in or after withdrawal and that prohibited fields are rejected.
 
@@ -702,6 +722,7 @@ The larger tester sample, device matrix, quantitative pass criteria, and diversi
 ### Must resolve before a public pilot
 
 - **Pose calibration and public-pilot acceptance:** calibrate the exact landmark-visibility and joint-angle thresholds and form-rule smoothing window from the confirmed demo protocol, then approve the larger tester sample, device matrix, quantitative pass criteria, and diversity protocol required for a public pilot.
+- **Live-presence operating envelope:** approve expected concurrent reservations, Broadcast message rate, heartbeat, expiry, absolute attempt-deadline configuration, reconnect tolerance, load-test pass criteria, degraded-mode behavior, and cost alert thresholds. The initial `10 s` heartbeat, `30 s` expiry, and target-plus-180-seconds deadline capped at `300 s` are implementation defaults until this evidence is accepted.
 - **Public-pilot launch envelope:** define the later pilot audience, expected concurrency, minimum supported browser/device matrix, measurable pass criteria, and approval date independently of the Build Week judging demo.
 - **Release ownership:** assign deployment, rollback, incident response, and final release authorization.
 
@@ -721,7 +742,7 @@ Development follows dependency and evidence milestones rather than calendar days
 
 - Scaffold the monorepo, SvelteKit application, shared packages, Supabase project structure, CI, preview deployments, and environment handling.
 - Configure Storybook for SvelteKit and establish design tokens, Pixelify Sans, accessibility defaults, typed domain interfaces, fixture builders, and injected service boundaries.
-- Define contracts for challenge loading, anonymous identity, progression, completions, artwork, placement, archive data, realtime events, camera state, and pose state.
+- Define contracts for challenge loading, anonymous identity, progression, reservations, heartbeat renewal, release, atomic completion/commit, artwork, archive data, realtime lifecycle events, camera state, and pose state.
 - Define the Supabase schema, migrations, storage policies, database functions, uniqueness constraints, Row Level Security, and anonymous-authentication baseline.
 
 **Exit gate:** the repository builds in CI, Storybook runs without production services, migrations apply cleanly, and frontend fixtures conform to shared contracts.
@@ -729,15 +750,16 @@ Development follows dependency and evidence milestones rather than calendar days
 ### Milestone 2 — high-risk technical prototypes
 
 - Prove camera permission, TensorFlow.js MoveNet loading, WebGL/WASM backend selection, landmark visibility, cleanup, and one side-view plank rule on representative devices.
-- Prove PixiJS initialization, crisp pixel rendering, pan/zoom, keyboard selection, coordinate mapping, culling, and graceful WebGL failure.
-- Prove anonymous Supabase access, atomic completion and placement functions, RLS behavior, initial canvas loading, and compact realtime pixel events.
+- Prove PixiJS initialization, crisp pixel rendering, pan/zoom, keyboard selection, coordinate mapping, pending-pixel animation, culling, and graceful WebGL failure.
+- Prove simultaneous TensorFlow.js and render-on-demand PixiJS operation on representative devices, including the lighter Canvas 2D or snapshot fallback used when both GPU workloads cannot be sustained.
+- Prove anonymous Supabase access, atomic reservation and completion/commit functions, one-coordinate and one-reservation constraints, heartbeat renewal, expiry, reconnect reconciliation, RLS behavior, initial canvas loading, and compact realtime lifecycle events.
 - Prototype the intro's scroll-to-timeline mapping, sprite batching, reduced-motion path, asset budget, and minimum-device performance.
 
 **Exit gate:** each risky subsystem has a tested prototype and recorded evidence supporting the production approach; unresolved failures update scope or compatibility requirements before feature implementation continues.
 
 ### Milestone 3 — mock-driven product experience
 
-- Build the seven static intro chapters and every participant, placement, archive, Leader, loading, empty, error, offline, and fallback state in Storybook.
+- Build the seven static intro chapters and every participant, reservation, live-presence, active side-by-side challenge, commit, release, archive, Leader, loading, empty, error, offline, and fallback state in Storybook.
 - Approve the six primary desktop journey states and responsive adaptations before connecting production services.
 - Add interaction, accessibility, and visual-regression tests for acceptance-critical stories.
 - Freeze the approved component contracts so backend, pose-engine, canvas-engine, and frontend integration can proceed independently.
@@ -746,7 +768,7 @@ Development follows dependency and evidence milestones rather than calendar days
 
 ### Milestone 4 — private pose session
 
-- Implement camera setup, required-landmark guidance, countdown, session lifecycle, timer, retries, abandonment, and completion transition.
+- Implement camera setup, required-landmark guidance, canvas-triggered countdown, side-by-side shared canvas and challenge rail, timer, retries, abandonment, and automatic commit or release transitions.
 - Implement hips-high, hips-low, bent-knee, and head-position rules with confidence thresholds, smoothing, hysteresis, the five-second form-grace state machine, and the separate 500 ms tracking-loss UI debounce.
 - Add landmark-fixture tests, resource-cleanup tests, permission and model-failure handling, and manual testing across representative bodies, cameras, lighting, clothing, and supported browsers.
 - Verify through instrumentation and network inspection that frames, landmarks, angles, and pose streams never leave the browser.
@@ -755,12 +777,12 @@ Development follows dependency and evidence milestones rather than calendar days
 
 ### Milestone 5 — shared canvas and daily progression
 
-- Implement UTC challenge selection, local reset display, anonymous progression, streaks, completion claims, and pixel entitlement.
-- Implement PixiJS artwork loading, target outline, completed pixels, pan/zoom, pointer and keyboard placement, fallback color, occupied-cell feedback, and accessibility mirror.
-- Integrate atomic placement, collision recovery, realtime updates, reconnect reconciliation, large-canvas chunking, and render-on-demand behavior.
+- Implement UTC challenge selection, local reset display, anonymous progression, streaks, reservation ownership, completion claims, and one-per-day pixel rules.
+- Implement PixiJS artwork loading, target outline, completed pixels, available-cell selection, owned and anonymous pending layers, pan/zoom, pointer and keyboard reservation, fallback color, occupied/reserved-cell feedback, and accessibility mirror.
+- Integrate atomic reservation, heartbeat renewal, expiry, release, completion/commit, collision recovery, anonymous realtime updates, aggregate active count, reconnect reconciliation, large-canvas chunking, and render-on-demand behavior.
 - Add the archive and read-only historical canvases.
 
-**Exit gate:** one successful session produces one entitlement, one entitlement produces at most one permanent pixel, collisions cannot overwrite pixels, and all clients converge on authoritative canvas state.
+**Exit gate:** one eligible attempt holds at most one reservation, success converts only the owned live reservation into one permanent pixel, failure or expiry releases it, collisions cannot overwrite reservations or pixels, and all clients converge on authoritative canvas state after reconnect.
 
 ### Milestone 6 — Leader workflow
 
@@ -780,7 +802,7 @@ Development follows dependency and evidence milestones rather than calendar days
 ### Milestone 8 — integration, hardening, and pilot release
 
 - Run the full CI suite, Storybook tests, unit tests, migration tests, security checks, and focused Playwright journeys against a preview Supabase environment.
-- Test representative phones and laptops, camera denial, missing landmarks, slow model loading, WebGL failure, UTC rollover, collision races, reconnects, offline recovery, cleared browser storage, and degraded performance.
+- Test representative phones and laptops, camera denial, missing landmarks, slow model loading, WebGL failure, simultaneous pose/canvas load, UTC rollover, reservation and completion races, heartbeat throttling, reconnects, offline recovery, cleared browser storage, and degraded performance.
 - Review privacy and safety copy, accessibility, analytics minimization, rate limits, operating cost, error monitoring, backup/rollback procedures, and deployment ownership.
 - Conduct a limited pilot, inspect failures and form-feedback quality, resolve launch-blocking defects, and expand availability only after the release gates pass.
 
@@ -824,7 +846,7 @@ Development follows dependency and evidence milestones rather than calendar days
 | 2026-07-14 | Daily duration starts at 30 seconds and increases by five seconds after success, with no hard maximum. | Superseded on 2026-07-15 |
 | 2026-07-14 | Poor form has a five-second grace period before the timer pauses. | Confirmed |
 | 2026-07-14 | MVP 1 requires no user registration and stores identity/progress per anonymous browser profile. | Confirmed |
-| 2026-07-14 | A participant places a pixel only after successful session completion. | Confirmed |
+| 2026-07-14 | A participant places a pixel only after successful session completion. | Superseded on 2026-07-16 |
 | 2026-07-14 | The Leader uploads prepared artwork; an art editor is excluded. | Confirmed |
 | 2026-07-14 | Previous canvases remain available in an archive tab. | Confirmed |
 | 2026-07-14 | Use a single worldwide UTC challenge day and show reset time locally. | Confirmed |
@@ -839,7 +861,7 @@ Development follows dependency and evidence milestones rather than calendar days
 | 2026-07-15 | MVP targets current major desktop and mobile browsers with graceful capability fallback. | Confirmed |
 | 2026-07-15 | All product UI text uses the Pixelify Sans pixel font. | Confirmed |
 | 2026-07-15 | The main page does not display “PERFECT FORM”; form status is session-only. | Confirmed |
-| 2026-07-15 | The main-page CTA progresses from `START 30 SEC` to `PLACE YOUR PIXEL` to disabled `YOUR PIXEL IS LIVE`. | Confirmed |
+| 2026-07-15 | The main-page CTA progresses from `START 30 SEC` to `PLACE YOUR PIXEL` to disabled `YOUR PIXEL IS LIVE`. | Superseded on 2026-07-16 |
 | 2026-07-15 | Use SvelteKit and TypeScript for the web application. | Confirmed |
 | 2026-07-15 | Use TensorFlow.js MoveNet for browser-only pose detection; no camera or keypoint stream is sent to the backend. | Confirmed |
 | 2026-07-15 | Use PixiJS v8 with pixi-viewport v6 for the interactive artwork. | Confirmed |
@@ -874,7 +896,13 @@ Development follows dependency and evidence milestones rather than calendar days
 | 2026-07-15 | Target a 30–45-second first-visit introduction at a normal scrolling pace, with no forced waits and `SKIP INTRO` visible from the beginning. | Confirmed |
 | 2026-07-15 | Intro audio is optional original ambient/chiptune music with simple effects, muted by default, with no voice-over and a persistent sound toggle; the story remains complete without sound. | Confirmed |
 | 2026-07-15 | Use an original, gender-neutral pixel-art protagonist without celebrity likeness or MVP customization, surrounded by deliberately varied participants that avoid gender, cultural, fitness, and body-type stereotypes. | Confirmed |
-| 2026-07-15 | Selecting an available canvas cell immediately submits the permanent pixel placement with no confirmation dialog or second click; the placement screen warns users in advance, and failed transactions preserve the entitlement. | Confirmed |
+| 2026-07-15 | Selecting an available canvas cell immediately submits the permanent pixel placement with no confirmation dialog or second click; the placement screen warns users in advance, and failed transactions preserve the entitlement. | Superseded on 2026-07-16 |
 | 2026-07-15 | The internal project team is the sole MVP 1 Leader and has editorial responsibility for choosing, preparing, scheduling, and publishing the pixel artwork; participant submissions and community voting are post-MVP. | Confirmed |
+| 2026-07-16 | MVP 1 uses a pixel-first challenge: after route, safety, and readiness requirements pass, selecting an available canvas cell atomically reserves it and triggers the three-second countdown; there is no separate start or post-completion placement action. | Confirmed |
+| 2026-07-16 | The owned reservation pulses and remains labelled on the shared canvas throughout the challenge. Success atomically records completion and locks that coordinate as a permanent pixel; failure, abandonment, expiry, reset, or lost ownership removes it. | Confirmed |
+| 2026-07-16 | The active challenge keeps a slightly zoomed-out shared canvas visible beside the timer, textual form-validation state, and compact local camera preview on desktop; mobile keeps the canvas above the challenge panel. | Confirmed |
+| 2026-07-16 | Anonymous realtime presence is included in MVP 1: active reservations pulse, committed pixels lock, released reservations disappear, and clients show an aggregate active count without exposing identity, exact personal timers, camera state, form state, or completion method. | Confirmed |
+| 2026-07-16 | Product presence is synchronized from authoritative reservation lifecycle events. Each participant and coordinate may have at most one active reservation; server expiry and heartbeat renewal prevent abandoned cells from remaining blocked. | Confirmed |
+| 2026-07-16 | Initial reservation timing defaults to a heartbeat every 10 seconds, expiry 30 seconds after the latest accepted heartbeat, and an absolute deadline equal to target duration plus 180 seconds capped at 300 seconds; the public-pilot operating envelope must validate or revise these values. | Confirmed for implementation; pilot validation required |
 
 </details>
