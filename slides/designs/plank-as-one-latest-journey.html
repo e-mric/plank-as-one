@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Plank As One — Latest Product Journey</title>
+  <style>
+    :root {
+      --cream: #fff4ea;
+      --paper: #fffaf5;
+      --peach: #ffd9c5;
+      --coral: #ff5a36;
+      --coral-dark: #d94323;
+      --ink: #241916;
+      --muted: #866c60;
+      --line: #efc4af;
+      --green: #4ca76a;
+      --amber: #efa51f;
+      --shadow: 0 24px 70px rgba(72, 37, 23, .18);
+      --mono: "Cascadia Mono", Consolas, monospace;
+      --sans: Aptos, Inter, Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: #211815; color: var(--ink); font-family: var(--sans); }
+    body { display: grid; place-items: center; min-height: 100vh; padding: 22px 22px 82px; }
+    button { font: inherit; }
+    button:focus-visible { outline: 3px solid rgba(255,90,54,.48); outline-offset: 3px; }
+
+    .deck { position: relative; width: min(1280px, calc(100vw - 44px)); aspect-ratio: 16 / 9; overflow: hidden; border-radius: 18px; background: var(--cream); box-shadow: var(--shadow); }
+    .slide { position: absolute; inset: 0; display: none; overflow: hidden; background: radial-gradient(circle at 74% 28%, rgba(255,216,190,.7), transparent 31%), var(--cream); }
+    .slide.active { display: block; }
+    .slide-inner { height: 100%; padding: 48px 64px 52px; }
+    .dark { color: #fff; background: var(--ink); }
+    .dark .muted { color: #d7b9aa; }
+
+    .eyebrow, .kicker, .mono { font-family: var(--mono); }
+    .eyebrow { color: var(--coral); font-size: 13px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { margin-bottom: 22px; font: 700 clamp(46px, 6vw, 82px)/.98 var(--mono); letter-spacing: -.055em; }
+    h2 { margin-bottom: 12px; font: 700 clamp(31px, 4vw, 52px)/1.03 var(--mono); letter-spacing: -.04em; }
+    h3 { margin-bottom: 8px; font: 700 20px/1.12 var(--mono); }
+    p { line-height: 1.45; }
+    .lede { max-width: 720px; color: var(--muted); font-size: 22px; line-height: 1.48; }
+    .muted { color: var(--muted); }
+    .accent { color: var(--coral); }
+    .rule { width: 100px; height: 4px; margin: 24px 0; background: var(--coral); }
+    .flow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--coral-dark); font: 700 15px/1 var(--mono); }
+    .flow i { font-style: normal; color: var(--muted); }
+
+    .footer { position: absolute; left: 64px; right: 64px; bottom: 22px; display: flex; align-items: center; justify-content: space-between; color: var(--muted); font: 700 11px/1 var(--mono); }
+    .footer b { color: var(--coral); }
+    .slide-index { color: var(--coral); }
+
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 42px; height: calc(100% - 30px); align-items: center; }
+    .three-col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .card { padding: 22px; border: 1px solid var(--line); border-radius: 16px; background: rgba(255,250,245,.84); }
+    .card .num { color: var(--coral); font: 700 12px/1 var(--mono); }
+    .card p { margin-bottom: 0; color: var(--muted); }
+    .badge { display: inline-flex; align-items: center; gap: 7px; min-height: 27px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,250,245,.92); color: var(--muted); font: 700 10px/1 var(--mono); }
+    .badge.live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px rgba(76,167,106,.14); }
+
+    .browser { position: relative; overflow: hidden; border: 2px solid var(--line); border-radius: 17px; background: var(--paper); box-shadow: 0 16px 42px rgba(82,45,30,.14); }
+    .browser-bar { height: 38px; display: flex; align-items: center; gap: 7px; padding: 0 13px; border-bottom: 1px solid var(--line); background: rgba(255,247,239,.94); }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--coral); }
+    .dot:nth-child(2) { background: var(--amber); }
+    .dot:nth-child(3) { background: var(--green); }
+    .browser-label { margin-left: auto; color: var(--muted); font: 700 9px/1 var(--mono); }
+    .browser-screen { position: relative; height: 440px; overflow: hidden; background: var(--paper); }
+    .browser-screen img { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+    .cover-old-action { position: absolute; right: 8px; bottom: 6px; width: 250px; height: 82px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--coral-dark); font: 700 11px/1.2 var(--mono); text-align: center; }
+
+    .title-layout { display: grid; grid-template-columns: .85fr 1.15fr; gap: 50px; height: 100%; align-items: center; }
+    .title-art { position: relative; height: 480px; overflow: hidden; border-radius: 44px; }
+    .title-art img { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+    .title-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(255,244,234,.05), rgba(255,244,234,.2)); }
+
+    .principle-line { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-top: 42px; }
+    .principle { min-height: 170px; padding: 18px; border-top: 4px solid var(--line); background: rgba(255,250,245,.55); }
+    .principle.active { border-color: var(--coral); }
+    .principle strong { display: block; margin: 13px 0 8px; font: 700 16px/1.2 var(--mono); }
+    .principle p { color: var(--muted); font-size: 14px; }
+
+    .story-art { position: relative; height: 500px; overflow: hidden; border-radius: 18px; }
+    .story-art img { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+    .story-copy { position: absolute; inset: 0 48% 0 0; padding: 62px 34px; background: linear-gradient(90deg, rgba(255,250,245,.98) 72%, transparent); }
+    .story-copy h3 { margin-top: 18px; font-size: 31px; }
+    .story-copy p { color: var(--muted); font-size: 17px; }
+
+    .canvas-mock { position: relative; height: 500px; overflow: hidden; border-radius: 17px; background: var(--cream); }
+    .canvas-mock > img { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+    .canvas-mock.zoomed > img { object-fit: contain; transform: scale(.91); }
+    .canvas-top { position: absolute; z-index: 5; left: 18px; right: 18px; top: 16px; display: flex; justify-content: space-between; gap: 14px; }
+    .canvas-title { font: 700 20px/1.12 var(--mono); }
+    .canvas-stats { display: flex; gap: 7px; }
+    .pulse { position: absolute; z-index: 6; width: 18px; height: 18px; transform: translate(-50%, -50%); border: 2px solid #fff; outline: 2px solid var(--coral); background: var(--coral); box-shadow: 0 0 0 7px rgba(255,90,54,.14); animation: pulse 1.25s ease-in-out infinite; }
+    .pulse.own { width: 32px; height: 32px; outline-width: 3px; box-shadow: 0 0 0 11px rgba(255,90,54,.17); }
+    .pulse.own::after { content: "YOUR PIXEL · PENDING"; position: absolute; left: 50%; top: 40px; transform: translateX(-50%); padding: 7px 9px; border-radius: 999px; background: var(--ink); color: #fff; font: 700 8px/1 var(--mono); white-space: nowrap; }
+    .pulse.locked { background: var(--ink); outline-color: var(--ink); animation: none; }
+    .pulse.released { opacity: .2; transform: translate(-50%, -50%) scale(.4); animation: none; }
+    @keyframes pulse { 50% { transform: translate(-50%, -50%) scale(1.15); box-shadow: 0 0 0 19px rgba(255,90,54,0); } }
+
+    .select-prompt { position: absolute; z-index: 8; left: 50%; bottom: 20px; transform: translateX(-50%); width: min(650px, calc(100% - 40px)); padding: 14px 18px; border: 2px solid var(--coral); border-radius: 10px; background: rgba(255,250,245,.96); color: var(--coral-dark); text-align: center; font: 700 12px/1.25 var(--mono); }
+
+    .route-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 24px; }
+    .route { min-height: 220px; padding: 20px; border: 2px solid var(--line); border-radius: 14px; background: rgba(255,250,245,.78); }
+    .route.primary { border-color: var(--coral); }
+    .route-icon { width: 43px; height: 43px; display: grid; place-items: center; border-radius: 10px; color: var(--coral-dark); background: var(--peach); font: 700 18px/1 var(--mono); }
+    .route h3 { margin-top: 20px; }
+    .route p { color: var(--muted); font-size: 15px; }
+
+    .safety { margin-top: 28px; padding: 24px 28px; border: 2px solid var(--line); border-radius: 16px; background: var(--paper); }
+    .safety h3 { font-size: 27px; }
+    .safety p { margin-bottom: 10px; color: var(--muted); }
+    .actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 14px; }
+    .button { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 10px 16px; border: 1px solid var(--coral); border-radius: 8px; background: var(--coral); color: #fff; font: 700 10px/1 var(--mono); }
+    .button.secondary { color: var(--coral-dark); background: transparent; }
+
+    .countdown { position: absolute; z-index: 8; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 24px 38px; border-radius: 18px; background: rgba(255,250,245,.95); box-shadow: var(--shadow); text-align: center; }
+    .countdown strong { font: 700 92px/1 var(--mono); color: var(--coral); }
+    .countdown span { display: block; margin-top: 8px; color: var(--muted); font: 700 11px/1 var(--mono); }
+
+    .active-layout { display: grid; grid-template-columns: 1.62fr .88fr; height: 500px; border: 2px solid var(--line); border-radius: 17px; overflow: hidden; background: var(--paper); }
+    .main-page-frame { width: 100%; height: 500px; border: 2px solid var(--line); border-radius: 17px; background: var(--cream); }
+    .main-page-slide { display: grid; grid-template-columns: .72fr 1.28fr; gap: 30px; height: 500px; align-items: center; }
+    .main-page-reference { height: 500px; display: grid; place-items: center; overflow: hidden; border: 2px solid var(--line); border-radius: 17px; background: var(--cream) url("assets/main-page-reference.png") center / contain no-repeat; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    .active-canvas { position: relative; overflow: hidden; border-right: 1px solid var(--line); background: var(--cream); }
+    .active-canvas > img { width: 100%; height: 100%; object-fit: contain; transform: scale(.91); image-rendering: pixelated; }
+    .active-canvas .cover-old-action { right: 8px; bottom: 8px; width: 285px; height: 112px; }
+    .challenge-rail { display: flex; flex-direction: column; padding: 22px; }
+    .challenge-rail h3 { margin-top: 14px; font-size: 28px; }
+    .timer { margin: 20px 0 2px; font: 700 55px/1 var(--mono); letter-spacing: -.05em; }
+    .timer-label { color: var(--muted); font: 700 9px/1 var(--mono); }
+    .form-state { display: flex; align-items: center; gap: 9px; margin-top: 16px; padding: 11px; border: 1px solid var(--line); border-radius: 9px; font: 700 9px/1 var(--mono); }
+    .form-state i { width: 10px; height: 10px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 5px rgba(76,167,106,.14); }
+    .camera { position: relative; overflow: hidden; height: 126px; margin-top: 13px; border: 1px solid var(--line); border-radius: 10px; }
+    .camera img { width: 100%; height: 100%; object-fit: cover; object-position: center 72%; image-rendering: pixelated; }
+    .camera span { position: absolute; left: 8px; bottom: 8px; padding: 5px 7px; border-radius: 5px; color: #fff; background: rgba(36,25,22,.9); font: 700 8px/1 var(--mono); }
+
+    .state-table { margin-top: 25px; border-top: 1px solid var(--line); }
+    .state-row { display: grid; grid-template-columns: 170px 1fr 1fr; gap: 18px; padding: 14px 0; border-bottom: 1px solid var(--line); align-items: center; }
+    .state-row strong { font: 700 12px/1.2 var(--mono); }
+    .state-row span { color: var(--muted); font-size: 15px; }
+
+    .split-outcome { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 30px; }
+    .outcome { min-height: 310px; padding: 28px; border: 2px solid var(--line); border-radius: 18px; background: rgba(255,250,245,.8); }
+    .outcome.success { border-color: var(--green); }
+    .outcome.failure { border-color: var(--coral); }
+    .outcome-pixel { width: 68px; height: 68px; margin-bottom: 24px; border: 5px solid var(--paper); outline: 4px solid var(--coral); background: var(--coral); }
+    .success .outcome-pixel { outline-color: var(--ink); background: var(--ink); }
+    .failure .outcome-pixel { opacity: .18; transform: scale(.65); }
+    .outcome ul { padding-left: 20px; color: var(--muted); line-height: 1.65; }
+
+    .mode-split { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 28px; }
+    .mode-card { min-height: 330px; padding: 28px; border: 2px solid var(--line); border-radius: 18px; background: rgba(255,250,245,.8); }
+    .mode-card h3 { margin-top: 18px; font-size: 28px; }
+    .mode-card ul { padding-left: 20px; color: var(--muted); line-height: 1.65; }
+
+    .architecture { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 32px; align-items: stretch; }
+    .arch-node { position: relative; min-height: 190px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,250,245,.8); }
+    .arch-node:not(:last-child)::after { content: "→"; position: absolute; right: -17px; top: 82px; z-index: 4; color: var(--coral); font: 700 20px/1 var(--mono); }
+    .arch-node strong { display: block; margin: 15px 0 8px; font: 700 15px/1.2 var(--mono); }
+    .arch-node p { color: var(--muted); font-size: 13px; }
+
+    .leader-layout { display: grid; grid-template-columns: .9fr 1.1fr; gap: 30px; margin-top: 25px; }
+    .leader-form { padding: 22px; border: 1px solid var(--line); border-radius: 15px; background: var(--paper); }
+    .field { margin-top: 14px; }
+    .field label { display: block; margin-bottom: 6px; color: var(--muted); font: 700 9px/1 var(--mono); }
+    .input { min-height: 40px; padding: 11px; border: 1px solid var(--line); border-radius: 7px; background: #fff; font: 12px/1.2 var(--mono); }
+    .leader-preview { overflow: hidden; border: 1px solid var(--line); border-radius: 15px; background: var(--paper); }
+    .leader-preview img { width: 100%; height: 330px; object-fit: cover; image-rendering: pixelated; opacity: .75; }
+
+    .nav { position: fixed; z-index: 30; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid rgba(255,255,255,.14); border-radius: 999px; background: rgba(25,17,14,.9); color: #fff; backdrop-filter: blur(10px); font: 700 11px/1 var(--mono); }
+    .nav button { min-width: 68px; padding: 8px 11px; border: 0; border-radius: 999px; background: var(--coral); color: #fff; cursor: pointer; font: inherit; }
+    .progress { width: 110px; height: 4px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.2); }
+    .progress i { display: block; height: 100%; background: var(--coral); transition: width .2s ease; }
+
+    body.export { display: block; width: 1280px; height: 720px; min-height: 720px; overflow: hidden; padding: 0; }
+    body.export .deck { width: 1280px; height: 720px; border-radius: 0; box-shadow: none; }
+    body.export .nav { display: none; }
+
+    @media (max-width: 900px) and (not (width: 1280px)) {
+      body { padding: 8px 8px 70px; }
+      .deck { width: calc(100vw - 16px); }
+      .slide-inner { padding: 30px 38px 42px; }
+      .footer { left: 38px; right: 38px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .pulse { animation: none; }
+      .progress i { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="deck" aria-label="Plank As One latest product journey presentation">
+    <section class="slide" data-key="cover">
+      <div class="slide-inner title-layout">
+        <div>
+          <div class="eyebrow">Latest MVP 1 product journey</div>
+          <h1>Plank<br />As One</h1>
+          <p class="lede">Choose a place. Hold it together. Turn one personal effort into one visible shared contribution.</p>
+          <div class="rule"></div>
+          <div class="flow">FEEL <i>→</i> CHOOSE <i>→</i> RESERVE <i>→</i> HOLD <i>→</i> BELONG</div>
+        </div>
+        <div class="title-art"><img src="assets/intro-collective.png" alt="Inclusive pixel-art participants holding planks beneath a shared field of pixels" /></div>
+      </div>
+      <div class="footer"><span>PLANK AS ONE · PRODUCT EXPERIENCE</span><b>01</b></div>
+    </section>
+
+    <section class="slide" data-key="principle">
+      <div class="slide-inner">
+        <div class="eyebrow">Experience principle</div>
+        <h2>The canvas stays. The moment changes.</h2>
+        <p class="lede">The product uses one persistent shared surface. Each step adds only the focused controls needed for the current decision.</p>
+        <div class="principle-line">
+          <article class="principle active"><span class="num mono">01</span><strong>Feel</strong><p>Understand why individual effort becomes collective art.</p></article>
+          <article class="principle"><span class="num mono">02</span><strong>Prepare</strong><p>Choose a trusted route, acknowledge safety, and become ready.</p></article>
+          <article class="principle"><span class="num mono">03</span><strong>Reserve</strong><p>Selecting a cell is the start action—there is no separate button.</p></article>
+          <article class="principle"><span class="num mono">04</span><strong>Hold together</strong><p>Your pulse remains visible among anonymous active participants.</p></article>
+          <article class="principle"><span class="num mono">05</span><strong>Resolve</strong><p>Success locks the pixel. Failure releases it.</p></article>
+        </div>
+      </div>
+      <div class="footer"><span>ONE PERSISTENT SURFACE</span><b>02</b></div>
+    </section>
+
+    <section class="slide" data-key="intro">
+      <div class="slide-inner two-col">
+        <div>
+          <div class="eyebrow">First visit · Intro 2 / 7</div>
+          <h2>Solo effort becomes shared momentum.</h2>
+          <p class="lede">While still on the ground, the figure looks toward the TV. One original runner becomes a group—then the figure tries again.</p>
+          <div class="rule"></div>
+          <div class="flow">7 CHAPTERS <i>·</i> SKIP ALWAYS VISIBLE <i>·</i> SOUND OFF BY DEFAULT</div>
+        </div>
+        <div class="story-art">
+          <img src="assets/intro-story.png" alt="Pixel-art figure on the ground looking toward a television where one runner becomes a group" />
+          <div class="story-copy"><span class="eyebrow">THE FIRST SPARK</span><h3>Effort feels different when you’re not alone.</h3><p>The story is complete without sound and transitions into today’s live canvas.</p></div>
+        </div>
+      </div>
+      <div class="footer"><span>OPTIONAL · ORIGINAL ASSETS · EVIDENCE-SAFE COPY</span><b>03</b></div>
+    </section>
+
+    <section class="slide" data-key="live-canvas">
+      <div class="slide-inner two-col">
+        <div>
+          <div class="eyebrow">Today’s live canvas</div>
+          <h2>You can already see that you are not alone.</h2>
+          <p class="lede">Permanent pixels build the artwork. Smaller anonymous pulses show people currently holding a reserved place.</p>
+          <div class="three-col">
+            <div class="card"><span class="num">128</span><h3>Today</h3><p>Permanent contributions.</p></div>
+            <div class="card"><span class="num">4</span><h3>Planking now</h3><p>Anonymous active reservations.</p></div>
+            <div class="card"><span class="num">30s</span><h3>Your target</h3><p>Current daily duration.</p></div>
+          </div>
+        </div>
+        <div class="browser">
+          <div class="browser-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span class="browser-label">TODAY’S CANVAS · LIVE</span></div>
+          <div class="canvas-mock">
+            <img src="assets/main.png" alt="Today’s shared PLANK AS ONE pixel canvas" />
+            <div class="canvas-top"><span class="badge live">4 PLANKING NOW</span><div class="canvas-stats"><span class="badge">128 TODAY</span><span class="badge">RESET 05:42</span></div></div>
+            <i class="pulse" style="left:24%;top:38%"></i><i class="pulse" style="left:71%;top:30%"></i><i class="pulse" style="left:42%;top:67%"></i><i class="pulse" style="left:78%;top:70%"></i>
+            <div class="select-prompt">SELECT A PIXEL TO BEGIN</div>
+            <div class="cover-old-action">AVAILABLE CELLS START THE CHALLENGE</div>
+          </div>
+        </div>
+      </div>
+      <div class="footer"><span>ANONYMOUS · AUTHORITATIVE RESERVATIONS · NO VIDEO SHARING</span><b>04</b></div>
+    </section>
+
+    <section class="slide" data-key="prepare">
+      <div class="slide-inner">
+        <div class="eyebrow">Before selecting a cell</div>
+        <h2>Prepare once, then return to the canvas.</h2>
+        <div class="route-grid">
+          <article class="route primary"><div class="route-icon">▦</div><h3>Camera validated</h3><p>Permission, on-device pose tracking, full-body framing, and a ready state. Frames and landmarks never leave the device.</p></article>
+          <article class="route"><div class="route-icon">◷</div><h3>Honor mode</h3><p>A real uninterrupted timer with no form validation. It earns the same streak and pixel and has no pause control.</p></article>
+          <article class="route"><div class="route-icon">▶</div><h3>Guided demo</h3><p>Simulated pose and isolated presence. It demonstrates the flow without changing the real canvas or progression.</p></article>
+        </div>
+        <div class="safety"><span class="eyebrow">BEFORE YOU START</span><h3>Make space. Listen to your body.</h3><p>Use a clear, stable exercise space. This application provides general fitness guidance, not medical advice.</p><p>Stop for concerning pain, chest pressure, dizziness, unusual shortness of breath, or a pounding or irregular heartbeat.</p><div class="actions"><span class="button secondary">GO BACK</span><span class="button">I UNDERSTAND</span></div></div>
+      </div>
+      <div class="footer"><span>ROUTE · SAFETY · READINESS</span><b>05</b></div>
+    </section>
+
+    <section class="slide" data-key="reserve">
+      <div class="slide-inner two-col">
+        <div>
+          <div class="eyebrow">Pixel-first entry</div>
+          <h2>The cell is the start action.</h2>
+          <p class="lede">Click, tap, or keyboard-activate an available coordinate. Server confirmation reserves it and immediately begins the three-second countdown.</p>
+          <div class="state-table">
+            <div class="state-row"><strong>Available</strong><span>Outlined target</span><span>Selectable</span></div>
+            <div class="state-row"><strong>Pending</strong><span>Pulsing pixel</span><span>Temporarily unavailable</span></div>
+            <div class="state-row"><strong>Committed</strong><span>Solid pixel</span><span>Permanent</span></div>
+          </div>
+        </div>
+        <div class="browser">
+          <div class="browser-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span class="browser-label">SELECT A PLACE</span></div>
+          <div class="canvas-mock">
+            <img src="assets/main.png" alt="Shared canvas with one available selected coordinate" />
+            <div class="canvas-top"><span class="badge">CAMERA READY</span><span class="badge">TARGET 00:30</span></div>
+            <i class="pulse own" style="left:49%;top:48%"></i>
+            <div class="select-prompt">SELECTING THIS CELL STARTS THE CHALLENGE · NO CONFIRMATION</div>
+            <div class="cover-old-action">RESERVATION REQUEST</div>
+          </div>
+        </div>
+      </div>
+      <div class="footer"><span>ATOMIC RESERVATION · COLLISION SAFE</span><b>06</b></div>
+    </section>
+
+    <section class="slide" data-key="countdown">
+      <div class="slide-inner two-col">
+        <div>
+          <div class="eyebrow">Reservation confirmed</div>
+          <h2>Your place pulses before effort begins.</h2>
+          <p class="lede">The reservation is visible to the group, but it remains anonymous. Countdown time never counts toward the challenge.</p>
+          <div class="flow">RESERVE <i>→</i> 3 · 2 · 1 <i>→</i> CREDIT VALID TIME</div>
+        </div>
+        <div class="browser">
+          <div class="browser-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span class="browser-label">RESERVED FOR THIS ATTEMPT</span></div>
+          <div class="canvas-mock zoomed">
+            <img src="assets/main.png" alt="Zoomed-out shared canvas during challenge countdown" />
+            <i class="pulse" style="left:26%;top:37%"></i><i class="pulse" style="left:72%;top:32%"></i><i class="pulse own" style="left:49%;top:51%"></i>
+            <div class="countdown"><strong>3</strong><span>CHALLENGE STARTS IN</span></div>
+            <div class="cover-old-action">CHALLENGE ACTIVE · PIXEL PENDING</div>
+          </div>
+        </div>
+      </div>
+      <div class="footer"><span>OWNED PULSE LABELLED · PEER PULSES ANONYMOUS</span><b>07</b></div>
+    </section>
+
+    <section class="slide" data-key="active">
+      <div class="slide-inner">
+        <div class="eyebrow">Active shared plank</div>
+        <h2>One main page before, during, and after effort.</h2>
+        <div class="main-page-slide">
+          <div>
+            <p class="lede">The active challenge stays integrated with the artwork instead of opening a separate session page.</p>
+            <div class="state-table">
+              <div class="state-row" style="grid-template-columns:130px 1fr"><strong>TOP</strong><span>Live presence, today, reset</span></div>
+              <div class="state-row" style="grid-template-columns:130px 1fr"><strong>CHALLENGE</strong><span>Timer, pose, grace, local-only</span></div>
+              <div class="state-row" style="grid-template-columns:130px 1fr"><strong>CANVAS</strong><span>Artwork and pulsing reservations</span></div>
+              <div class="state-row" style="grid-template-columns:130px 1fr"><strong>EDGE</strong><span>Streak remains visible</span></div>
+            </div>
+          </div>
+          <div class="main-page-reference" role="img" aria-label="Canonical vertical Plank As One active main-page design"><span class="sr-only">Live counts at the top, timer and validated plank form above the shared pixel canvas, and streak at the lower edge.</span></div>
+        </div>
+      </div>
+      <div class="footer"><span>COUNTS → TIMER → FORM → CANVAS → STREAK</span><b>08</b></div>
+    </section>
+
+    <section class="slide" data-key="form-states">
+      <div class="slide-inner">
+        <div class="eyebrow">Credited-time rules</div>
+        <h2>Form feedback changes the timer—not the shared canvas.</h2>
+        <div class="state-table">
+          <div class="state-row"><strong class="accent">VALID FORM</strong><span>`FORM VALIDATED · TIME COUNTING`</span><span>Timer advances</span></div>
+          <div class="state-row"><strong>VISIBLE ERROR</strong><span>Hips, knees, or head feedback + five-second grace</span><span>Invalid grace time never counts</span></div>
+          <div class="state-row"><strong>TRACKING LOSS</strong><span>`MOVE INTO FRAME` after 500 ms UI debounce</span><span>Credited time stops immediately</span></div>
+          <div class="state-row"><strong>HONOR MODE</strong><span>`FORM NOT CAMERA-VALIDATED`</span><span>Continuous active-page timer</span></div>
+        </div>
+        <div class="three-col" style="margin-top:24px">
+          <article class="card"><span class="num">LOCAL</span><h3>Private processing</h3><p>No camera frame, landmark, angle, or pose stream is transmitted.</p></article>
+          <article class="card"><span class="num">SHARED</span><h3>Only presence state</h3><p>Coordinate, color, anonymous lifecycle state, expiry, and server timestamp.</p></article>
+          <article class="card"><span class="num">ACCESSIBLE</span><h3>Text mirrors state</h3><p>Color and animation never carry essential meaning alone.</p></article>
+        </div>
+      </div>
+      <div class="footer"><span>PRIVATE FORM · PUBLIC ANONYMOUS PRESENCE</span><b>09</b></div>
+    </section>
+
+    <section class="slide" data-key="resolve">
+      <div class="slide-inner">
+        <div class="eyebrow">Automatic resolution</div>
+        <h2>One reservation. Two possible outcomes.</h2>
+        <div class="split-outcome">
+          <article class="outcome success"><div class="outcome-pixel"></div><h3>Complete → commit</h3><ul><li>Record completion and progression.</li><li>Convert the owned reservation into one permanent pixel.</li><li>Stop the pulse and close the camera.</li><li>Announce `YOUR PIXEL IS LIVE`.</li></ul></article>
+          <article class="outcome failure"><div class="outcome-pixel"></div><h3>Fail or leave → release</h3><ul><li>Remove the pending pixel.</li><li>Return the coordinate to availability.</li><li>Record no completion or progression.</li><li>Retry by selecting another available cell.</li></ul></article>
+        </div>
+      </div>
+      <div class="footer"><span>NO POST-COMPLETION PLACEMENT SCREEN</span><b>10</b></div>
+    </section>
+
+    <section class="slide" data-key="modes">
+      <div class="slide-inner">
+        <div class="eyebrow">Alternative routes</div>
+        <h2>Real participation stays distinct from simulation.</h2>
+        <div class="mode-split">
+          <article class="mode-card"><span class="badge">HONOR MODE · REAL</span><h3>Trusted, uninterrupted participation.</h3><ul><li>Reserves a real cell.</li><li>Shows a real pending pulse.</li><li>No pause or resume.</li><li>Leaving releases the cell.</li><li>Success commits the normal streak and pixel.</li></ul></article>
+          <article class="mode-card"><span class="badge">GUIDED DEMO · SIMULATED</span><h3>The complete flow without real effects.</h3><ul><li>Uses isolated simulated pose data.</li><li>Presence and reservation are visibly simulated.</li><li>No real streak, progression, or pixel.</li><li>Never mutates the shared canvas.</li><li>Always retains the demo label.</li></ul></article>
+        </div>
+      </div>
+      <div class="footer"><span>CAMERA · HONOR · ISOLATED DEMO</span><b>11</b></div>
+    </section>
+
+    <section class="slide" data-key="leader">
+      <div class="slide-inner">
+        <div class="eyebrow">Internal Leader workflow</div>
+        <h2>The project team curates every MVP artwork.</h2>
+        <div class="leader-layout">
+          <div class="leader-form"><span class="badge">ALLOW-LISTED PROJECT TEAM</span><div class="field"><label>CHALLENGE DATE</label><div class="input">2026-07-17 · 00:00 UTC</div></div><div class="field"><label>PREPARED ARTWORK</label><div class="input">64 × 64 PNG · transparent pixels excluded</div></div><div class="field"><label>FALLBACK COLOR</label><div class="input">#FF5A36 · ACCENT ORANGE</div></div><div class="field"><label>PUBLISH STATE</label><div class="input">READY TO SCHEDULE</div></div><div class="actions"><span class="button">SCHEDULE CHALLENGE</span></div></div>
+          <div class="leader-preview"><img src="assets/main.png" alt="Leader preview of the prepared shared canvas artwork" /><div style="padding:16px 20px;display:flex;justify-content:space-between"><span class="mono">LOW-OPACITY TARGET PREVIEW</span><span class="badge">64 × 64 VALID</span></div></div>
+        </div>
+      </div>
+      <div class="footer"><span>NO PARTICIPANT ARTWORK SUBMISSIONS IN MVP 1</span><b>12</b></div>
+    </section>
+
+    <section class="slide" data-key="lifecycle">
+      <div class="slide-inner">
+        <div class="eyebrow">Authoritative realtime lifecycle</div>
+        <h2>Presence is a server-owned state machine.</h2>
+        <div class="architecture">
+          <article class="arch-node"><span class="num mono">01</span><strong>Select cell</strong><p>Client requests one coordinate after route, safety, and readiness.</p></article>
+          <article class="arch-node"><span class="num mono">02</span><strong>Reserve atomically</strong><p>Server enforces one active reservation per participant and coordinate.</p></article>
+          <article class="arch-node"><span class="num mono">03</span><strong>Heartbeat</strong><p>10-second renewal, 30-second rolling expiry, and an absolute attempt deadline.</p></article>
+          <article class="arch-node"><span class="num mono">04</span><strong>Broadcast lifecycle</strong><p>Anonymous pending, committed, or released coordinate state only.</p></article>
+          <article class="arch-node"><span class="num mono">05</span><strong>Reconcile</strong><p>Postgres snapshot is authoritative after reconnect or missed events.</p></article>
+        </div>
+        <div class="three-col" style="margin-top:24px">
+          <article class="card"><span class="num">PRIVACY</span><h3>No public owner ID</h3><p>No identity, personal timer, form state, camera state, or completion method.</p></article>
+          <article class="card"><span class="num">RELIABILITY</span><h3>Expired means available</h3><p>Stale reservations cannot block cells indefinitely.</p></article>
+          <article class="card"><span class="num">PERFORMANCE</span><h3>Render on demand</h3><p>Animate visible pending cells only; degrade the canvas when GPU capacity is limited.</p></article>
+        </div>
+      </div>
+      <div class="footer"><span>SUPABASE · POSTGRES · REALTIME BROADCAST</span><b>13</b></div>
+    </section>
+
+    <section class="slide dark" data-key="closing">
+      <div class="slide-inner title-layout">
+        <div>
+          <div class="eyebrow">Experience promise</div>
+          <h1>Hold your<br />place together.</h1>
+          <p class="lede muted">The participant sees the shared canvas before, during, and after effort. A pending pulse says “I’m here”; a permanent pixel says “I completed it.”</p>
+          <div class="rule"></div>
+          <div class="flow">SELECT <i>→</i> PULSE <i>→</i> HOLD <i>→</i> LOCK <i>→</i> BELONG</div>
+        </div>
+        <div class="title-art"><img src="assets/intro-collective.png" alt="Inclusive community of participants contributing to one shared pixel canvas" /></div>
+      </div>
+      <div class="footer"><span>ONE PLANK · ONE PIXEL · ONE CANVAS</span><b>14</b></div>
+    </section>
+  </main>
+
+  <nav class="nav" aria-label="Presentation navigation"><button id="prev" type="button">← PREV</button><span id="label"></span><span class="progress" aria-hidden="true"><i id="progress"></i></span><button id="next" type="button">NEXT →</button></nav>
+
+  <script>
+    (() => {
+      const slides = [...document.querySelectorAll('.slide')];
+      const params = new URLSearchParams(location.search);
+      const requested = params.get('slide');
+      const exportMode = params.get('export') === '1';
+      let index = Math.max(0, slides.findIndex((slide) => slide.dataset.key === requested));
+      if (exportMode) document.body.classList.add('export');
+
+      const render = () => {
+        slides.forEach((slide, slideIndex) => slide.classList.toggle('active', slideIndex === index));
+        document.getElementById('label').textContent = `${index + 1} / ${slides.length}`;
+        document.getElementById('progress').style.width = `${((index + 1) / slides.length) * 100}%`;
+        if (!exportMode) history.replaceState(null, '', `?slide=${slides[index].dataset.key}`);
+      };
+
+      document.getElementById('prev').addEventListener('click', () => { index = (index - 1 + slides.length) % slides.length; render(); });
+      document.getElementById('next').addEventListener('click', () => { index = (index + 1) % slides.length; render(); });
+      addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowLeft' || event.key === 'PageUp') document.getElementById('prev').click();
+        if (event.key === 'ArrowRight' || event.key === 'PageDown' || event.key === ' ') document.getElementById('next').click();
+        if (event.key === 'Home') { index = 0; render(); }
+        if (event.key === 'End') { index = slides.length - 1; render(); }
+      });
+      render();
+    })();
+  </script>
+</body>
+</html>

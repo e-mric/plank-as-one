@@ -212,7 +212,7 @@ The notice provides `GO BACK` and `I UNDERSTAND` actions. It applies to camera-v
 - Clicking or tapping an available cell, or activating the focused cell with the keyboard, atomically attempts to reserve that coordinate for the current anonymous participant and challenge attempt. The selection itself is sufficient; there is no confirmation dialog or second action.
 - A successful reservation enters a `pending` state, starts the standard three-second countdown, and makes the coordinate temporarily unavailable to other participants. The participant’s pending pixel pulses on the canvas and is labelled `YOUR PIXEL · PENDING`.
 - Other active reservations are rendered as smaller anonymous pulsing pixels. They never disclose identity, camera use, exact timer progress, form status, or completion method.
-- The participant sees the shared canvas throughout the countdown and challenge. On wide screens, the canvas is slightly zoomed out beside a challenge panel containing the timer, form-validation status, and compact local camera preview. On narrow screens, the canvas remains visible above a challenge panel or bottom sheet.
+- The participant sees one continuous main page throughout the countdown and challenge. Live presence and daily totals remain at the top; the credited timer, validated pose visualization, grace indicator, and on-device notice sit above the shared artwork; the canvas remains centered below them; and the streak sits at the lower edge. Responsive layouts preserve this vertical order rather than moving the challenge into a separate route or side rail.
 - Camera-validated sessions display text such as `FORM VALIDATED · TIME COUNTING` only while valid time is being credited. Invalid-form and tracking-loss rules in section 8.2 continue to control the timer. Honor mode remains labelled `FORM NOT CAMERA-VALIDATED` and does not show a camera preview or form-valid state.
 - A successful challenge atomically records the completion, progression update, and permanent pixel at the reserved coordinate. The pending pulse stops and the pixel becomes fully locked without another participant action.
 - An incomplete or explicitly abandoned attempt releases the reservation and removes the pending pixel. Page exit, loss of reservation ownership, heartbeat expiry, challenge reset, or an unrecoverable session error also releases it. The participant may retry by selecting an available cell again.
@@ -278,7 +278,7 @@ Before the standard daily journey, a first-time participant can view or skip the
 6. Optionally enter the clearly labelled guided demo; simulated results and presence remain isolated from real participant state.
 7. Select an available canvas coordinate to atomically reserve it and trigger the three-second countdown. A collision asks the participant to choose another cell without consuming entitlement.
 8. See the selected pixel pulse as `YOUR PIXEL · PENDING` among smaller anonymous pending pixels.
-9. Keep the shared canvas visible beside or above the challenge timer, form-validation status, and compact local camera preview where applicable.
+9. Keep the challenge timer, form-validation visualization, grace state, shared canvas, live-presence count, and streak together on one vertically ordered main page.
 10. Start crediting time after the countdown according to the selected route: valid detected form for camera mode or continuous active-page time for honor mode.
 11. See which camera form rule is failing and a five-second correction countdown.
 12. Stop crediting time immediately when required landmarks are lost, show `MOVE INTO FRAME` after the 500 ms UI debounce, or pause after visible incorrect form continues beyond the five-second grace period.
@@ -463,7 +463,7 @@ Compatibility and accessibility:
 - An unbounded canvas needs collision rules and a viewport strategy even if participant capacity is unlimited.
 - Progression beyond 120 seconds could expose participants to targets that are unsafe, impractical, or impossible for them; it remains disabled unless a later safety review approves a higher ceiling, validates the guidance, and authorizes release.
 - Browser-only identity means streak loss is expected when site storage is cleared or a different device is used.
-- TensorFlow.js and PixiJS both use GPU resources. The new side-by-side active experience intentionally overlaps them, so the canvas must render on demand, animate sparingly, and degrade to a lighter snapshot when the supported device cannot sustain both.
+- TensorFlow.js and PixiJS both use GPU resources. The unified active main page intentionally overlaps them, so the canvas must render on demand, animate sparingly, and degrade to a lighter snapshot when the supported device cannot sustain both.
 - A PixiJS/WebGL canvas requires a DOM accessibility layer and a view-only fallback when GPU initialization is unavailable.
 - A mandatory or lengthy introduction can delay the core action and reduce first-session conversion; it must be immediately skippable and measured separately from challenge starts.
 - Film-derived imagery creates intellectual-property, brand, schedule, and maintenance risk. MVP and the public pilot use only the original runner-and-followers scene; any later licensing initiative requires a separate scope and review.
@@ -492,7 +492,7 @@ The supplied concept establishes the preferred visual language:
 
 The design should preserve this restraint. New features should appear as light overlays, edge controls, compact status strips, or temporary bottom sheets rather than a dashboard of opaque cards.
 
-The current interaction reference is the [pixel-first challenge with anonymous live presence](../slides/designs/pixel-first-challenge.html).
+The current main-page reference is the [vertical active-canvas design](../slides/designs/main-page.html). The broader journey remains documented in the [latest HTML product journey](../slides/designs/plank-as-one-latest-journey.html).
 
 ### 14.2 Proposed adaptation A — Canvas Monument
 
@@ -507,16 +507,16 @@ Best for emotional impact and fidelity to the supplied design. Less information 
 
 ### 14.3 Proposed adaptation B — Ritual Split
 
-On wide screens, keep the slightly zoomed-out shared artwork in roughly two-thirds of the active viewport and place a narrow challenge rail in the remaining third. During the challenge, the rail contains the credited timer, textual form-validation state, compact local camera preview, privacy note, and session-exit control. The participant's larger labelled pulse and smaller anonymous pulses remain visible on the artwork. On mobile, the canvas stays visible above the rail, which becomes a bottom sheet beneath it.
+Use one vertically composed main page at all breakpoints. The top row holds `PLANKING NOW`, daily contribution count, and reset time. During the challenge, a centered timer and validated pose visualization appear above the shared artwork, followed by the grace indicator and on-device notice. The artwork stays large and centered, with the participant's labelled pulse and smaller anonymous pulses visible within it; the streak anchors the lower edge. Responsive changes adjust scale and spacing without changing this information order.
 
 Best balance of clarity and visual character. This is the recommended production direction because it scales cleanly from desktop to mobile without covering the art.
 
 ### 14.4 Proposed adaptation C — Shared active session
 
-During exercise, retain the shared canvas and open the challenge rail beside or below it. Show:
+During exercise, retain the shared canvas on the same page and reveal the challenge state above it. Show:
 
 - A large pixel timer.
-- A compact local camera preview with a thin landmark skeleton or joint markers.
+- A centered privacy-preserving pose visualization with a thin landmark skeleton or joint markers.
 - The current state: `GET IN FRAME`, `PERFECT FORM`, `FIX HIPS`, `STRAIGHTEN KNEES`, `LIFT HEAD`, or `PAUSED`.
 - A five-cell grace indicator that empties once per invalid second.
 - A persistent local-processing badge.
@@ -549,7 +549,7 @@ The MVP’s principal journey should read as one continuous ritual:
 1. **Today’s live canvas:** the participant arrives on a desktop main page dominated by the partially completed `PLANK AS ONE` artwork. Filled squares show permanent contributions, pale outlined squares show available targets, and small anonymous pulses show current reservations. The page also shows streak, target, local reset countdown, archive/menu access, `PLANKING NOW`, and `SELECT A PIXEL TO BEGIN`. It does not show `PERFECT FORM` at the top.
 2. **Route, safety, and readiness:** the participant chooses camera validation or honor mode and acknowledges the safety notice. Camera participants grant permission and complete framing guidance before the canvas becomes selectable; honor participants receive the keep-this-page-open warning. Guided demo remains isolated.
 3. **Reserve and countdown:** selecting an available cell atomically reserves it and immediately triggers the clear `3`, `2`, `1` countdown. The selected cell becomes a larger labelled `YOUR PIXEL · PENDING` pulse. A collision refreshes the cell and returns focus to canvas selection.
-4. **Active shared plank:** the shared canvas remains visible and slightly zoomed out. On desktop, a challenge rail sits beside it; on mobile, the canvas stays above the rail. The rail shows `00:00 / 00:30`, form state such as `FORM VALIDATED · TIME COUNTING`, a compact on-device camera preview where applicable, and correction or tracking-loss states. Anonymous pending pixels continue pulsing on the canvas.
+4. **Active shared plank:** the unified main page keeps live-presence and daily counts at the top, then shows `00:00 / 00:30`, the validated pose visualization, grace state, and on-device notice above the centered shared canvas. The streak remains visible at the lower edge. Anonymous pending pixels continue pulsing on the canvas.
 5. **Automatic commit:** after the required credited time, one atomic server transaction records completion and progression and converts the owned reservation into a permanent pixel. The pulse stops, the camera closes, and the interface announces `YOUR PIXEL IS LIVE`. No placement screen or second click occurs.
 6. **Automatic release:** if the attempt is abandoned, fails, expires, loses reservation ownership, or encounters an unrecoverable error, the pending pixel fades out, the coordinate becomes available, and the participant may retry by selecting a cell again.
 
@@ -660,7 +660,7 @@ At minimum, Storybook must expose the following desktop states before backend in
 | Today's canvas | Loading, load failure with retry, partial artwork with `SELECT A PIXEL TO BEGIN`, anonymous live count, multiple pending pulses, reduced-motion pending state, fully completed target with selection outside the artwork, reset imminent, disconnected/reconnecting, and authoritative snapshot reconciliation. |
 | Camera setup | Shared safety notice, acknowledged notice, same-day retry bypass, new UTC day, changed safety-copy version, permission explanation, permission denied, unsupported camera, model loading, model failure, move into frame, insufficient visible landmarks, and ready. |
 | Countdown | `3`, `2`, `1`, cancelled because the pose was lost, and transition to the active timer. |
-| Active plank | Zoomed-out canvas beside the challenge rail, owned and anonymous pending pulses, compact camera preview, valid form with `FORM VALIDATED · TIME COUNTING`, hips too high, hips too low, bent knees, incorrect head position, each second of the five-second grace period, brief tracking loss recovered inside 500 ms, persistent tracking loss with `MOVE INTO FRAME`, paused timer, recovered form, reservation heartbeat, abandoned session, automatic release, and automatic commit. |
+| Active plank | Unified vertical main page, top live/daily/reset counts, timer and validated pose above the canvas, owned and anonymous pending pulses, streak at the lower edge, valid form with `FORM VALIDATED · TIME COUNTING`, hips too high, hips too low, bent knees, incorrect head position, each second of the five-second grace period, brief tracking loss recovered inside 500 ms, persistent tracking loss with `MOVE INTO FRAME`, paused timer, recovered form, reservation heartbeat, abandoned session, automatic release, and automatic commit. |
 | Guided demo | Entry from camera setup, permission denied, unsupported camera, persistent simulated-data label, scripted valid and invalid form, isolated reservation, isolated completion or release, and exit to real participant state. |
 | Honor mode | Shared safety notice, entry without camera, persistent `FORM NOT CAMERA-VALIDATED` label, cell reservation, countdown, continuous timer with no pause control, owned pending pulse, `END SESSION`, tab switch, browser background, device lock, navigation away, release message, retry, automatic commit, shared-entitlement conflict, and return to camera setup. |
 | Pixel reservation and presence | Reservation available with up-front start notice, pointer/focused-keyboard preview, occupied or remotely reserved target, direct selection without confirmation, submitting, collision conflict, one-reservation-per-participant conflict, heartbeat accepted or rejected, expiry, explicit release, reconnect with owned reservation restored, reconnect after expiry, duplicate/delayed/out-of-order lifecycle events, anonymous peer join/complete/release, successful atomic commit, and remote permanent pixel arrival. |
@@ -678,7 +678,7 @@ Storybook is the primary component and screen-state harness, but it is one layer
 - **Unit tests:** Vitest tests for first-visit/replay routing, scroll-progress timeline mapping, countdown logic, UTC challenge-day and versioned safety-acknowledgment calculations, duration progression, honor-mode continuous timing and page-visibility abandonment, form-grace state machine, tracking-loss debounce, canvas coordinate conversion, reservation lifecycle reducers, heartbeat, rolling expiry and absolute-deadline calculations, reconnect reconciliation, idempotent realtime-event handling, and UI stores. If analytics are introduced for a later pilot, add consent, withdrawal, event allow-list, and prohibited-field tests before enabling collection.
 - **Story tests:** Storybook's Vitest integration runs render and interaction tests against acceptance-critical stories. Test keyboard and pointer flows for route preparation, direct cell reservation, countdown, cancellation, retry, collision recovery, automatic commit, and automatic release, including the absence of a start button, placement screen, or second confirmation action.
 - **Accessibility checks:** Run Storybook accessibility checks on all primary stories. Critical violations fail CI.
-- **Visual regression:** Capture stable desktop snapshots for the six primary journey states, including the side-by-side active canvas and challenge rail. Dynamic timestamps, pulse phase, random coordinates, live counts, and realtime events must be frozen for deterministic comparisons.
+- **Visual regression:** Capture stable desktop snapshots for the six primary journey states, including the vertically composed active main page. Dynamic timestamps, pulse phase, random coordinates, live counts, and realtime events must be frozen for deterministic comparisons.
 - **End-to-end tests:** Keep a small Playwright suite for the integrated camera reserve-to-commit happy path, the real honor-mode reserve-to-commit path and page-hide release, collision between two anonymous participants, heartbeat expiry and reconnect, the isolated guided-demo happy path, Leader soft removal, and critical failures against a local or preview Supabase environment. Assert that camera and honor modes share one entitlement, demo reservation and completion never mutate real participant or canvas state, released or expired reservations never become permanent pixels, and moderation reopens the coordinate without restoring the removed participant's entitlement. Do not duplicate the entire Storybook state matrix in E2E tests.
 - **Pose-engine tests:** Test form classification, the five-second grace state machine, and immediate time exclusion plus the 500 ms tracking-loss debounce separately with recorded landmark fixtures. Manual camera/device testing remains required because mocked stories cannot validate real pose-estimation accuracy.
 
@@ -759,7 +759,7 @@ Development follows dependency and evidence milestones rather than calendar days
 
 ### Milestone 3 — mock-driven product experience
 
-- Build the seven static intro chapters and every participant, reservation, live-presence, active side-by-side challenge, commit, release, archive, Leader, loading, empty, error, offline, and fallback state in Storybook.
+- Build the seven static intro chapters and every participant, reservation, live-presence, unified active main-page, commit, release, archive, Leader, loading, empty, error, offline, and fallback state in Storybook.
 - Approve the six primary desktop journey states and responsive adaptations before connecting production services.
 - Add interaction, accessibility, and visual-regression tests for acceptance-critical stories.
 - Freeze the approved component contracts so backend, pose-engine, canvas-engine, and frontend integration can proceed independently.
@@ -768,7 +768,7 @@ Development follows dependency and evidence milestones rather than calendar days
 
 ### Milestone 4 — private pose session
 
-- Implement camera setup, required-landmark guidance, canvas-triggered countdown, side-by-side shared canvas and challenge rail, timer, retries, abandonment, and automatic commit or release transitions.
+- Implement camera setup, required-landmark guidance, canvas-triggered countdown, unified vertical active main page, timer, retries, abandonment, and automatic commit or release transitions.
 - Implement hips-high, hips-low, bent-knee, and head-position rules with confidence thresholds, smoothing, hysteresis, the five-second form-grace state machine, and the separate 500 ms tracking-loss UI debounce.
 - Add landmark-fixture tests, resource-cleanup tests, permission and model-failure handling, and manual testing across representative bodies, cameras, lighting, clothing, and supported browsers.
 - Verify through instrumentation and network inspection that frames, landmarks, angles, and pose streams never leave the browser.
@@ -900,7 +900,8 @@ Development follows dependency and evidence milestones rather than calendar days
 | 2026-07-15 | The internal project team is the sole MVP 1 Leader and has editorial responsibility for choosing, preparing, scheduling, and publishing the pixel artwork; participant submissions and community voting are post-MVP. | Confirmed |
 | 2026-07-16 | MVP 1 uses a pixel-first challenge: after route, safety, and readiness requirements pass, selecting an available canvas cell atomically reserves it and triggers the three-second countdown; there is no separate start or post-completion placement action. | Confirmed |
 | 2026-07-16 | The owned reservation pulses and remains labelled on the shared canvas throughout the challenge. Success atomically records completion and locks that coordinate as a permanent pixel; failure, abandonment, expiry, reset, or lost ownership removes it. | Confirmed |
-| 2026-07-16 | The active challenge keeps a slightly zoomed-out shared canvas visible beside the timer, textual form-validation state, and compact local camera preview on desktop; mobile keeps the canvas above the challenge panel. | Confirmed |
+| 2026-07-16 | The active challenge keeps a slightly zoomed-out shared canvas visible beside the timer, textual form-validation state, and compact local camera preview on desktop; mobile keeps the canvas above the challenge panel. | Superseded by the vertical main-page composition on 2026-07-16 |
+| 2026-07-16 | The canonical active main page uses one vertical composition: live/daily/reset counts at the top; timer, validated pose, grace state, and on-device notice above the centered shared canvas; anonymous and owned pulses within the canvas; and streak at the lower edge. Responsive layouts preserve this order. | Confirmed |
 | 2026-07-16 | Anonymous realtime presence is included in MVP 1: active reservations pulse, committed pixels lock, released reservations disappear, and clients show an aggregate active count without exposing identity, exact personal timers, camera state, form state, or completion method. | Confirmed |
 | 2026-07-16 | Product presence is synchronized from authoritative reservation lifecycle events. Each participant and coordinate may have at most one active reservation; server expiry and heartbeat renewal prevent abandoned cells from remaining blocked. | Confirmed |
 | 2026-07-16 | Initial reservation timing defaults to a heartbeat every 10 seconds, expiry 30 seconds after the latest accepted heartbeat, and an absolute deadline equal to target duration plus 180 seconds capped at 300 seconds; the public-pilot operating envelope must validate or revise these values. | Confirmed for implementation; pilot validation required |

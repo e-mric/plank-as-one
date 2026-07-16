@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Plank As One — Main Page</title>
+  <style>
+    :root {
+      --cream: #fff4ea;
+      --paper: #fff8f1;
+      --coral: #ff5a36;
+      --coral-dark: #d94323;
+      --ink: #241916;
+      --muted: #866c60;
+      --line: #efc4af;
+      --green: #4ca76a;
+      --mono: "Cascadia Mono", Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: var(--cream); color: var(--ink); }
+    body { font-family: Aptos, Inter, Arial, sans-serif; }
+
+    .main-page { position: relative; width: min(1120px, 100%); min-height: 1460px; margin: 0 auto; overflow: hidden; padding: 82px 68px 88px; background: radial-gradient(circle at 50% 34%, rgba(255,218,195,.42), transparent 35%), var(--cream); }
+    .status-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+    .status-group { display: flex; align-items: center; gap: 12px; }
+    .chip { display: inline-flex; align-items: center; min-height: 42px; padding: 10px 16px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,248,241,.86); color: var(--muted); font: 700 13px/1 var(--mono); white-space: nowrap; }
+    .chip.live { gap: 10px; }
+    .live-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 6px rgba(76,167,106,.14); }
+
+    .challenge { width: min(600px, 76%); margin: 138px auto 0; text-align: center; }
+    .active-crop { position: relative; height: 360px; overflow: hidden; }
+    .active-crop img { position: absolute; left: 50%; top: -34px; width: 590px; max-width: none; transform: translateX(-50%); image-rendering: pixelated; }
+    .validation { display: inline-flex; align-items: center; gap: 9px; margin-top: 6px; padding: 9px 13px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: rgba(255,248,241,.88); font: 700 10px/1 var(--mono); }
+    .validation i { width: 9px; height: 9px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px rgba(76,167,106,.14); }
+
+    .canvas-region { position: relative; width: min(790px, 88%); height: 650px; margin: 44px auto 0; }
+    .art-crop { position: absolute; left: 0; top: 0; width: 100%; height: 590px; overflow: hidden; }
+    .art-crop img { position: absolute; left: 0; top: -54px; width: 100%; image-rendering: pixelated; }
+    .art-cover { position: absolute; z-index: 5; right: 0; top: 20%; width: 32%; height: 80%; background: var(--cream); }
+
+    .presence-layer { position: absolute; inset: 0; pointer-events: none; }
+    .pulse { position: absolute; width: 15px; height: 15px; transform: translate(-50%, -50%); border: 2px solid var(--paper); outline: 2px solid var(--coral); background: var(--coral); box-shadow: 0 0 0 5px rgba(255,90,54,.14); animation: pulse 1.3s ease-in-out infinite; }
+    .pulse.own { width: 25px; height: 25px; outline-width: 3px; }
+    .pulse.own::after { content: "YOUR PIXEL"; position: absolute; left: 50%; top: 31px; transform: translateX(-50%); padding: 6px 8px; border-radius: 999px; background: var(--ink); color: #fff; font: 700 8px/1 var(--mono); white-space: nowrap; }
+    @keyframes pulse { 50% { transform: translate(-50%, -50%) scale(1.13); box-shadow: 0 0 0 17px rgba(255,90,54,0); } }
+
+    .streak { position: absolute; z-index: 10; right: 0; bottom: 12px; width: 130px; text-align: center; font-family: var(--mono); }
+    .streak span { display: block; font-size: 18px; font-weight: 700; }
+    .streak strong { display: block; margin: 7px 0; font-size: 48px; line-height: 1; }
+    .streak small { font-size: 17px; font-weight: 700; }
+
+    .privacy { position: absolute; left: 50%; bottom: 34px; transform: translateX(-50%); color: var(--muted); font: 700 10px/1 var(--mono); }
+
+    body.embed .main-page { width: 100%; min-height: 100vh; height: 100vh; padding-top: 58px; }
+    body.embed .privacy { display: none; }
+
+    @media (max-width: 760px) {
+      .main-page { min-height: 1160px; padding: 34px 18px 62px; }
+      .status-row { align-items: flex-start; }
+      .status-group { gap: 7px; }
+      .chip { min-height: 34px; padding: 8px 10px; font-size: 10px; }
+      .live-dot { width: 9px; height: 9px; box-shadow: 0 0 0 4px rgba(76,167,106,.14); }
+      .challenge { width: 92%; margin-top: 76px; }
+      .active-crop { height: 278px; }
+      .active-crop img { width: 470px; }
+      .canvas-region { width: 100%; height: 550px; margin-top: 28px; }
+      .art-crop { width: 100%; height: 510px; }
+      .art-crop img { top: -38px; width: 100%; }
+      .art-cover { width: 30%; height: 78%; }
+      .streak { right: 4px; bottom: 0; width: 100px; }
+      .streak span, .streak small { font-size: 13px; }
+      .streak strong { font-size: 37px; }
+    }
+
+    @media (max-width: 480px) {
+      .main-page { min-height: 940px; }
+      .status-row { gap: 7px; }
+      .status-group { gap: 4px; }
+      .chip { padding: 7px 7px; font-size: 7.5px; }
+      .challenge { margin-top: 54px; }
+      .active-crop { height: 210px; }
+      .active-crop img { top: -28px; width: 380px; }
+      .canvas-region { height: 450px; margin-top: 18px; }
+      .art-crop { height: 430px; }
+      .art-crop img { top: -27px; width: 100%; }
+      .art-cover { width: 30%; height: 78%; }
+      .streak { width: 82px; }
+      .streak span, .streak small { font-size: 11px; }
+      .streak strong { font-size: 31px; }
+      .privacy { font-size: 8px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .pulse { animation: none; box-shadow: 0 0 0 7px rgba(255,90,54,.18); }
+    }
+  </style>
+</head>
+<body>
+  <main class="main-page" aria-label="Plank As One active main page">
+    <header class="status-row">
+      <span class="chip live"><i class="live-dot" aria-hidden="true"></i><b id="live-count">4</b>&nbsp; PLANKING NOW</span>
+      <div class="status-group"><span class="chip"><b id="today-count">128</b>&nbsp; TODAY</span><span class="chip">RESET&nbsp; 05:42</span></div>
+    </header>
+
+    <section class="challenge" aria-label="Active camera-validated plank challenge">
+      <div class="active-crop"><img src="assets/active.png" alt="00:18 of 00:30 plank timer, validated plank form, grace indicator, and on-device-only notice" /></div>
+      <div class="validation"><i aria-hidden="true"></i>FORM VALIDATED · TIME COUNTING</div>
+    </section>
+
+    <section class="canvas-region" aria-label="Shared canvas and anonymous live reservations">
+      <div class="art-crop"><img src="assets/main.png" alt="Shared PLANK AS ONE pixel artwork" /><span class="art-cover" aria-hidden="true"></span></div>
+      <div class="presence-layer" aria-hidden="true">
+        <i class="pulse" style="left:22%;top:25%"></i>
+        <i class="pulse" style="left:71%;top:22%;animation-delay:-.5s"></i>
+        <i class="pulse own" style="left:49%;top:48%;animation-delay:-.8s"></i>
+        <i class="pulse" style="left:36%;top:68%;animation-delay:-.2s"></i>
+      </div>
+      <aside class="streak" aria-label="Seven-day streak"><span>STREAK</span><strong>7</strong><small>DAYS</small></aside>
+    </section>
+
+    <div class="privacy">CAMERA AND FORM VALIDATION STAY ON THIS DEVICE</div>
+  </main>
+
+  <script>
+    (() => {
+      const params = new URLSearchParams(location.search);
+      if (params.get('embed') === '1') document.body.classList.add('embed');
+
+      const live = document.getElementById('live-count');
+      const today = document.getElementById('today-count');
+      let liveCount = 4;
+      let todayCount = 128;
+      window.setInterval(() => {
+        if (Math.random() > .5) {
+          liveCount = Math.max(2, Math.min(7, liveCount + (Math.random() > .5 ? 1 : -1)));
+          live.textContent = String(liveCount);
+        } else {
+          todayCount += 1;
+          today.textContent = String(todayCount);
+        }
+      }, 6000);
+    })();
+  </script>
+</body>
+</html>
