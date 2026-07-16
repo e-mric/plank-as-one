@@ -19,11 +19,11 @@ The app uses mock data, so no database, account, camera, or backend service is r
 
 ## Try the user journey
 
-1. Choose **Camera mode** or **Honor mode**.
-2. Read and acknowledge the safety guidance.
-3. Select an outlined pixel in the shared artwork. Selecting it reserves the pixel and starts the countdown.
-4. Hold the plank for the displayed duration. In Camera mode, the mock form controls demonstrate valid, bad-form, and tracking-loss states.
-5. Complete the challenge to lock the pixel permanently for the session. Ending the session releases the pending pixel so it can be retried.
+1. Read and acknowledge the safety guidance.
+2. Keep the default **Camera mode** or switch to **Honor mode** using the chips at the left of the header.
+3. Select an outlined pixel in the shared artwork. Selecting it locks the chosen mode for that attempt, reserves the pixel, and starts the countdown.
+4. Hold the plank for the displayed duration. In a development build, the floating **DEV TOOLS** panel can simulate valid form, low hips, high hips, and tracking loss; it is excluded from production builds.
+5. Complete the challenge to lock the pixel permanently for the session. Ending the session releases the pending pixel and lets you switch modes before retrying.
 
 The character changes between ready, perfect, and bad poses as the mock challenge state changes, then shows a celebrating pose on completion or an exhausted pose when an attempt is released. Anonymous active participants and existing pixels are also represented with mock presence data.
 

@@ -13,22 +13,26 @@ test('shared canvas is the PLANK AS ONE artwork mask, not a generic grid', () =>
   assert.ok(state.cells.some((cell) => !cell.target && cell.status === 'empty'));
 });
 
-test('real route requires safety acknowledgment before reservation', () => {
+test('camera is default, mode locks on pixel choice, and safety precedes reservation', () => {
   let s = createInitialState();
-  s = chooseMode(s, 'honor');
+  assert.equal(s.mode, 'camera');
   assert.equal(s.stage, 'safety');
-  const cellId = availableCell(s);
-  assert.equal(selectCell(s, cellId).stage, 'safety');
   s = acknowledgeSafety(s);
   assert.equal(s.stage, 'ready');
+  s = chooseMode(s, 'honor');
+  assert.equal(s.mode, 'honor');
+  const cellId = availableCell(s);
   s = selectCell(s, cellId);
   assert.equal(s.stage, 'countdown');
+  assert.equal(s.modeLocked, true);
+  assert.equal(s.requestedCell, null);
   assert.equal(s.cells[cellId].status, 'pending');
+  assert.equal(chooseMode(s, 'camera').mode, 'honor');
   assert.ok(s.cells.some((cell) => cell.status === 'other'));
 });
 
 test('countdown enters active and honor mode commits at target', () => {
-  let s = acknowledgeSafety(chooseMode(createInitialState({ target: 2 }), 'honor'));
+  let s = chooseMode(acknowledgeSafety(createInitialState({ target: 2 })), 'honor');
   s = selectCell(s, availableCell(s));
   s = tick(s, 3000);
   assert.equal(s.stage, 'active');
@@ -37,14 +41,15 @@ test('countdown enters active and honor mode commits at target', () => {
   assert.equal(s.lastOutcome, 'complete');
   assert.equal(s.cells.find((cell) => cell.status === 'locked' && cell.id === s.selectedCell)?.status, 'locked');
   assert.equal(s.completions, 1);
+  assert.equal(s.completionMethod, 'honor');
   assert.equal(s.target, 7);
 });
 
-test('camera invalid form gets five-second grace and then pauses; valid resumes', () => {
-  let s = acknowledgeSafety(chooseMode(createInitialState({ target: 10 }), 'camera'));
+test('camera low-hips form gets five-second grace and then pauses; valid resumes', () => {
+  let s = acknowledgeSafety(createInitialState({ target: 10 }));
   s = selectCell(s, availableCell(s));
   s = tick(s, 3000);
-  s = setForm(s, 'invalid');
+  s = setForm(s, 'hips-low');
   s = tick(s, 4999);
   assert.equal(s.stage, 'grace');
   assert.equal(s.creditedMs, 0);
@@ -56,8 +61,16 @@ test('camera invalid form gets five-second grace and then pauses; valid resumes'
   assert.equal(s.creditedMs, 1000);
 });
 
+test('camera high-hips form enters the same correction grace state', () => {
+  let s = acknowledgeSafety(createInitialState({ target: 10 }));
+  s = tick(selectCell(s, availableCell(s)), 3000);
+  s = setForm(s, 'hips-high');
+  assert.equal(s.form, 'hips-high');
+  assert.equal(s.stage, 'grace');
+});
+
 test('camera tracking loss debounces for 500ms before pausing time', () => {
-  let s = acknowledgeSafety(chooseMode(createInitialState({ target: 10 }), 'camera'));
+  let s = acknowledgeSafety(createInitialState({ target: 10 }));
   s = tick(selectCell(s, availableCell(s)), 3000);
   s = tick(s, 1000);
   s = setForm(s, 'tracking');
@@ -66,13 +79,13 @@ test('camera tracking loss debounces for 500ms before pausing time', () => {
   assert.equal(s.creditedMs, 1000);
   s = tick(s, 1);
   assert.equal(s.stage, 'paused');
-  assert.equal(s.notice, 'MOVE INTO FRAME');
+  assert.equal(s.notice, 'HEY, COME BACK!');
   s = setForm(s, 'valid');
   assert.equal(s.stage, 'active');
 });
 
-test('ending an attempt releases pending reservation and permits retry', () => {
-  let s = acknowledgeSafety(chooseMode(createInitialState(), 'honor'));
+test('ending an attempt releases the pixel and mode lock for retry', () => {
+  let s = chooseMode(acknowledgeSafety(createInitialState()), 'honor');
   const cellId = availableCell(s);
   s = selectCell(s, cellId);
   s = endSession(s);
@@ -80,13 +93,31 @@ test('ending an attempt releases pending reservation and permits retry', () => {
   assert.equal(s.lastOutcome, 'failed');
   assert.equal(s.cells[cellId].status, 'available');
   assert.equal(s.selectedCell, null);
+  assert.equal(s.modeLocked, false);
+  s = chooseMode(s, 'camera');
+  assert.equal(s.mode, 'camera');
+  assert.equal(s.stage, 'ready');
 });
 
 test('a successful browser identity cannot earn a second pixel on the same day', () => {
-  let s = acknowledgeSafety(chooseMode(createInitialState({ target: 1 }), 'honor'));
+  let s = chooseMode(acknowledgeSafety(createInitialState({ target: 1 })), 'honor');
   s = tick(selectCell(s, availableCell(s)), 3000);
   s = tick(s, 1000);
   assert.equal(s.stage, 'complete');
   assert.equal(chooseMode(s, 'camera').stage, 'complete');
   assert.equal(selectCell(s, 5).completions, 1);
+});
+
+test('a pixel selected before safety acknowledgement is reserved only after acknowledgement', () => {
+  let s = createInitialState({ stage: 'ready' });
+  const cellId = availableCell(s);
+  s = selectCell(s, cellId);
+  assert.equal(s.stage, 'safety');
+  assert.equal(s.modeLocked, true);
+  assert.equal(s.requestedCell, cellId);
+  assert.equal(s.cells[cellId].status, 'available');
+  s = acknowledgeSafety(s);
+  assert.equal(s.stage, 'countdown');
+  assert.equal(s.requestedCell, null);
+  assert.equal(s.cells[cellId].status, 'pending');
 });

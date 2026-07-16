@@ -19,8 +19,9 @@ export function createInitialState(overrides = {}) {
     };
   }));
   return {
-    mode: null,
-    stage: 'idle',
+    mode: 'camera',
+    modeLocked: false,
+    stage: 'safety',
     safetyAcknowledged: false,
     safetyCopyVersion: SAFETY_COPY_VERSION,
     target: 30,
@@ -30,6 +31,7 @@ export function createInitialState(overrides = {}) {
     trackingMs: 0,
     form: 'valid',
     selectedCell: null,
+    requestedCell: null,
     cells,
     liveCount: 4,
     todayCount: 128,
@@ -44,29 +46,42 @@ export function createInitialState(overrides = {}) {
 
 export function chooseMode(state, mode) {
   if (!['camera', 'honor'].includes(mode)) return state;
-  if (state.completions > 0 && state.stage === 'complete') return state;
-  return { ...state, mode, stage: state.safetyAcknowledged ? 'ready' : 'safety', notice: '' };
+  if (state.modeLocked || state.stage !== 'ready' || state.completions > 0) return state;
+  return { ...state, mode, notice: '' };
 }
 
 export function acknowledgeSafety(state) {
   if (!state.mode) return state;
-  return { ...state, safetyAcknowledged: true, stage: 'ready', notice: '' };
+  const acknowledged = { ...state, safetyAcknowledged: true, stage: 'ready', notice: '' };
+  return state.requestedCell === null
+    ? acknowledged
+    : startAttempt(acknowledged, state.requestedCell);
 }
 
-export function selectCell(state, cellId) {
-  if (state.stage !== 'ready' || !state.safetyAcknowledged) return state;
+function startAttempt(state, cellId) {
   const cell = state.cells.find((item) => item.id === cellId);
   if (!cell || cell.status !== 'available') return state;
   const cells = state.cells.map((item) => item.id === cellId ? { ...item, status: 'pending' } : item);
-  return { ...state, stage: 'countdown', countdown: 3, creditedMs: 0, graceMs: 0, trackingMs: 0, form: 'valid', selectedCell: cellId, lastOutcome: null, cells, notice: '' };
+  return { ...state, stage: 'countdown', countdown: 3, creditedMs: 0, graceMs: 0, trackingMs: 0, form: 'valid', selectedCell: cellId, requestedCell: null, lastOutcome: null, cells, notice: '' };
+}
+
+export function selectCell(state, cellId) {
+  if (state.stage !== 'ready' || !state.mode) return state;
+  const cell = state.cells.find((item) => item.id === cellId);
+  if (!cell || cell.status !== 'available') return state;
+  if (!state.safetyAcknowledged) {
+    return { ...state, stage: 'safety', modeLocked: true, requestedCell: cellId, lastOutcome: null, notice: '' };
+  }
+  return startAttempt({ ...state, modeLocked: true }, cellId);
 }
 
 export function setForm(state, form) {
-  if (!['valid', 'invalid', 'tracking'].includes(form)) return state;
+  if (!['valid', 'invalid', 'hips-low', 'hips-high', 'tracking'].includes(form)) return state;
   if (state.stage !== 'active' && state.stage !== 'grace' && state.stage !== 'paused') return { ...state, form };
   if (form === 'valid') return { ...state, form, stage: 'active', graceMs: 0, trackingMs: 0, notice: '' };
-  if (form === 'tracking') return { ...state, form, trackingMs: 0, notice: 'TRACKING LOSS · RECOVERING' };
-  return { ...state, form, stage: 'grace', graceMs: 0, trackingMs: 0, notice: 'CORRECT FORM · 5 SEC GRACE' };
+  if (form === 'tracking') return { ...state, form, trackingMs: 0, notice: 'HEY, COME BACK!' };
+  const notice = form === 'hips-low' ? 'HIPS TOO LOW' : form === 'hips-high' ? 'HIPS TOO HIGH' : 'CORRECT FORM';
+  return { ...state, form, stage: 'grace', graceMs: 0, trackingMs: 0, notice };
 }
 
 export function tick(state, milliseconds) {
@@ -78,7 +93,7 @@ export function tick(state, milliseconds) {
   if (state.stage !== 'active' && state.stage !== 'grace') return state;
   if (state.mode === 'camera' && state.form === 'tracking') {
     const trackingMs = state.trackingMs + milliseconds;
-    return trackingMs < 500 ? { ...state, trackingMs } : { ...state, stage: 'paused', trackingMs: 500, notice: 'MOVE INTO FRAME' };
+    return trackingMs < 500 ? { ...state, trackingMs } : { ...state, stage: 'paused', trackingMs: 500, notice: 'HEY, COME BACK!' };
   }
   if (state.mode === 'camera' && state.stage === 'grace') {
     const graceMs = state.graceMs + milliseconds;
@@ -98,7 +113,7 @@ export function tick(state, milliseconds) {
 export function endSession(state) {
   if (!['countdown', 'active', 'grace', 'paused'].includes(state.stage)) return state;
   const cells = state.cells.map((item) => item.id === state.selectedCell ? { ...item, status: 'available' } : item);
-  return { ...state, stage: 'ready', cells, selectedCell: null, countdown: 0, creditedMs: 0, graceMs: 0, trackingMs: 0, lastOutcome: 'failed', notice: 'SESSION RELEASED · PICK A NEW CELL TO RETRY' };
+  return { ...state, stage: 'ready', modeLocked: false, cells, selectedCell: null, countdown: 0, creditedMs: 0, graceMs: 0, trackingMs: 0, lastOutcome: 'failed', notice: 'SESSION RELEASED · PICK A NEW CELL TO RETRY' };
 }
 
 export function reduce(state, action) {

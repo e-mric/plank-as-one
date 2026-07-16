@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Status | Reviewed MVP definition draft; unresolved release decisions remain |
-| Last updated | 2026-07-16 |
+| Last updated | 2026-07-17 |
 | Target | MVP 1 web application released after its acceptance and safety gates pass |
 | Hackathon | OpenAI Build Week, submission deadline 2026-07-21 at 5:00 p.m. PDT |
 | Submission review | [Build Week compliance and submission checklist](./BUILD_WEEK_REVIEW_CHECKLIST.md) |
@@ -170,7 +170,7 @@ MVP 1 checks:
 
 Poor form receives a five-second grace period before the timer pauses. Invalid time in the grace window does not count toward the required duration. Returning to valid form clears the grace countdown and resumes accumulation. Thresholds should use hysteresis or smoothing so the timer does not rapidly alternate between valid and invalid states.
 
-Missing or low-confidence required landmarks are tracking loss, not incorrect form. Uncertain time stops counting immediately. A 500 ms debounce suppresses brief UI flicker; if tracking has not recovered when it expires, the interface shows `MOVE INTO FRAME` and the session remains paused. The five-second correction grace period does not apply to tracking loss.
+Missing or low-confidence required landmarks are tracking loss, not incorrect form. Uncertain time stops counting immediately. A 500 ms debounce suppresses brief UI flicker; if tracking has not recovered when it expires, the interface shows `HEY, COME BACK!` and the session remains paused. The five-second correction grace period does not apply to tracking loss.
 
 MVP 1 officially supports a left or right side view, including a slight three-quarter angle, with one participant's full body visible. At least one reliable chain of ear, shoulder, hip, knee, and ankle landmarks must meet the configured visibility threshold. The timer remains blocked and the interface provides repositioning guidance for frontal, rear, partial-body, multi-person, or low-confidence views. Broader angle and partial-body support are post-MVP goals, not guarantees.
 
@@ -205,7 +205,8 @@ The notice provides `GO BACK` and `I UNDERSTAND` actions. It applies to camera-v
 ### 8.4 Pixel-first reservation and canvas contribution
 
 - Selecting an available canvas cell is the action that begins a real camera-validated or honor-mode challenge. There is no separate `START 30 SEC` or post-completion `PLACE YOUR PIXEL` action.
-- Before cell selection is enabled, the participant must choose a real challenge route, acknowledge the current safety notice, and complete any required camera permission and framing readiness steps. Guided demo uses an isolated simulated canvas and never reserves a real cell.
+- `CAMERA MODE` and `HONOR MODE` are persistent selection chips in the header's left status position rather than a separate route modal. They replace the former `PLANKING NOW` chip; anonymous live activity remains visible beside the canvas. Camera mode is selected by default. The participant may switch modes until selecting a pixel; pixel selection locks the chosen mode only for that active attempt. `END SESSION` releases both the pending pixel and the mode lock, allowing the participant to choose either mode before retrying.
+- Before cell selection is enabled, the participant must confirm the active mode, acknowledge the current safety notice, and complete any required camera permission and framing readiness steps. Guided demo uses an isolated simulated canvas and never reserves a real cell.
 - The canvas uses an effectively unbounded coordinate space rather than a fixed participant capacity.
 - The Leader’s prepared pixel-art image is displayed at low opacity as the shared target.
 - An available target cell previews its artwork color. A cell outside a completed target previews the Leader-defined fallback color.
@@ -213,7 +214,7 @@ The notice provides `GO BACK` and `I UNDERSTAND` actions. It applies to camera-v
 - A successful reservation enters a `pending` state, starts the standard three-second countdown, and makes the coordinate temporarily unavailable to other participants. The participant’s pending pixel pulses on the canvas and is labelled `YOUR PIXEL · PENDING`.
 - Other active reservations are rendered as smaller anonymous pulsing pixels. They never disclose identity, camera use, exact timer progress, form status, or completion method.
 - The participant sees one continuous main page throughout the countdown and challenge. Live presence and daily totals remain at the top; the credited timer, validated pose visualization, grace indicator, and on-device notice sit above the shared artwork; the canvas remains centered below them; and the streak sits at the lower edge. Responsive layouts preserve this vertical order rather than moving the challenge into a separate route or side rail.
-- Camera-validated sessions display text such as `FORM VALIDATED · TIME COUNTING` only while valid time is being credited. Invalid-form and tracking-loss rules in section 8.2 continue to control the timer. Honor mode remains labelled `FORM NOT CAMERA-VALIDATED` and does not show a camera preview or form-valid state.
+- Camera mode keeps a fixed-height five-cell feedback block visible across ready, countdown, active, failure, and completion states to prevent layout shifts. It shows `READY ?` with empty cells before the attempt, `PERFECT FORM 🔥` while valid time is credited, `HIPS TOO LOW` or `HIPS TOO HIGH` during correction, `HEY, COME BACK!` during tracking loss, `POWER UP +2` on completion, and `TOO BAD!` after an abandoned attempt. Honor mode remains labelled `FORM NOT CAMERA-VALIDATED` and does not show camera form feedback.
 - A successful challenge atomically records the completion, progression update, and permanent pixel at the reserved coordinate. The pending pulse stops and the pixel becomes fully locked without another participant action.
 - An incomplete or explicitly abandoned attempt releases the reservation and removes the pending pixel. Page exit, loss of reservation ownership, heartbeat expiry, challenge reset, or an unrecoverable session error also releases it. The participant may retry by selecting an available cell again.
 - Each active reservation has a server expiry and is renewed by a lightweight heartbeat while the attempt remains eligible. MVP defaults are a heartbeat every 10 seconds and expiry 30 seconds after the latest accepted heartbeat; these values are configuration, not client authority, and require load and background-behavior validation before the public pilot.
@@ -281,7 +282,7 @@ Before the standard daily journey, a first-time participant can view or skip the
 9. Keep the challenge timer, form-validation visualization, grace state, shared canvas, live-presence count, and streak together on one vertically ordered main page.
 10. Start crediting time after the countdown according to the selected route: valid detected form for camera mode or continuous active-page time for honor mode.
 11. See which camera form rule is failing and a five-second correction countdown.
-12. Stop crediting time immediately when required landmarks are lost, show `MOVE INTO FRAME` after the 500 ms UI debounce, or pause after visible incorrect form continues beyond the five-second grace period.
+12. Stop crediting time immediately when required landmarks are lost, show `HEY, COME BACK!` after the 500 ms UI debounce, or pause after visible incorrect form continues beyond the five-second grace period.
 13. Receive anonymous realtime reservation, release, and committed-pixel updates without reloading the page.
 14. Complete one qualifying daily session and see the pending pixel atomically become a permanent locked contribution with no second placement action.
 15. On failure, abandonment, expiry, or loss of reservation ownership, see the pending pixel disappear and retry by selecting an available cell.
@@ -507,7 +508,7 @@ Best for emotional impact and fidelity to the supplied design. Less information 
 
 ### 14.3 Proposed adaptation B — Ritual Split
 
-Use one vertically composed main page at all breakpoints. The top row holds `PLANKING NOW`, daily contribution count, and reset time. During the challenge, a centered timer and validated pose visualization appear above the shared artwork, followed by the grace indicator and on-device notice. The artwork stays large and centered, with the participant's labelled pulse and smaller anonymous pulses visible within it; the streak anchors the lower edge. Responsive changes adjust scale and spacing without changing this information order.
+Use one vertically composed main page at all breakpoints. The top row holds the `CAMERA MODE` and `HONOR MODE` controls, daily contribution count, reset time, and streak. During the challenge, a centered timer and validated pose visualization appear above the shared artwork, followed by the grace indicator and on-device notice. The artwork stays large and centered, with the participant's labelled pulse and smaller anonymous pulses visible within it. Responsive changes adjust scale and spacing without changing this information order.
 
 Best balance of clarity and visual character. This is the recommended production direction because it scales cleanly from desktop to mobile without covering the art.
 
@@ -546,7 +547,7 @@ After completion, stop the participant's pulse and lock the reserved coordinate 
 
 The MVP’s principal journey should read as one continuous ritual:
 
-1. **Today’s live canvas:** the participant arrives on a desktop main page dominated by the partially completed `PLANK AS ONE` artwork. Filled squares show permanent contributions, pale outlined squares show available targets, and small anonymous pulses show current reservations. The page also shows streak, target, local reset countdown, archive/menu access, `PLANKING NOW`, and `SELECT A PIXEL TO BEGIN`. It does not show `PERFECT FORM` at the top.
+1. **Today’s live canvas:** the participant arrives on a desktop main page dominated by the partially completed `PLANK AS ONE` artwork. Filled squares show permanent contributions, pale outlined squares show available targets, and small anonymous pulses show current reservations. The page also shows the Camera/Honor selector, streak, target, local reset countdown, archive/menu access, anonymous canvas activity, and `SELECT YOUR PIXEL`. It shows `READY ?` with an empty five-cell indicator rather than claiming valid form before the attempt.
 2. **Route, safety, and readiness:** the participant chooses camera validation or honor mode and acknowledges the safety notice. Camera participants grant permission and complete framing guidance before the canvas becomes selectable; honor participants receive the keep-this-page-open warning. Guided demo remains isolated.
 3. **Reserve and countdown:** selecting an available cell atomically reserves it and immediately triggers the clear `3`, `2`, `1` countdown. The selected cell becomes a larger labelled `YOUR PIXEL · PENDING` pulse. A collision refreshes the cell and returns focus to canvas selection.
 4. **Active shared plank:** the unified main page keeps live-presence and daily counts at the top, then shows `00:00 / 00:30`, the validated pose visualization, grace state, and on-device notice above the centered shared canvas. The streak remains visible at the lower edge. Anonymous pending pixels continue pulsing on the canvas.
