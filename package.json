@@ -1,0 +1,23 @@
+{
+  "name": "plank-as-one",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "cd apps/web && npm run dev",
+    "build": "cd apps/web && npm run build",
+    "check": "cd apps/web && npm run check",
+    "preview": "cd apps/web && npm run preview",
+    "start": "cd apps/web && npm run dev",
+    "test": "cd apps/web && npm run test"
+  },
+  "devDependencies": {
+    "@fontsource/pixelify-sans": "^5.2.5",
+    "@sveltejs/adapter-auto": "^4.0.0",
+    "@sveltejs/kit": "^2.16.0",
+    "@sveltejs/vite-plugin-svelte": "^5.0.0",
+    "svelte": "^5.0.0",
+    "svelte-check": "^4.0.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0"
+  }
+}

@@ -1,0 +1,6 @@
+:root { --cream:#fff4ea; --paper:#fffaf5; --coral:#ff5a36; --coral-dark:#d94323; --ink:#241916; --muted:#866c60; --line:#efc4af; --green:#4ca76a; --peach:#ffd4bf; --mono:"Pixelify Sans",sans-serif; }
+* { box-sizing:border-box; }
+html { background:var(--cream); }
+body { margin:0; min-height:100vh; color:var(--ink); background:radial-gradient(circle at 50% 28%,rgba(255,218,195,.7),transparent 36%),var(--cream); font-family:"Pixelify Sans",sans-serif; }
+button { font:inherit; cursor:pointer; }
+button:disabled { cursor:not-allowed; }
