@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createInitialState, chooseMode, acknowledgeSafety, selectCell, tick, setForm, endSession, ARTWORK_WIDTH, ARTWORK_HEIGHT } from '../state.js';
+import { createInitialState, chooseMode, acknowledgeSafety, selectCell, confirmReadyPosition, tick, setForm, endSession, ARTWORK_WIDTH, ARTWORK_HEIGHT } from '../state.js';
 
 const availableCell = (state, offset = 0) => state.cells.filter((cell) => cell.status === 'available')[offset].id;
 
@@ -45,9 +45,27 @@ test('countdown enters active and honor mode commits at target', () => {
   assert.equal(s.target, 4);
 });
 
+test('camera waits for a detected ready position before starting the countdown', () => {
+  let s = acknowledgeSafety(createInitialState({ target: 2 }));
+  const cellId = availableCell(s);
+  s = selectCell(s, cellId);
+  assert.equal(s.stage, 'positioning');
+  assert.equal(s.countdown, 0);
+  assert.equal(s.cells[cellId].status, 'pending');
+  s = tick(s, 3000);
+  assert.equal(s.stage, 'positioning');
+  assert.equal(s.creditedMs, 0);
+  s = confirmReadyPosition(s);
+  assert.equal(s.stage, 'countdown');
+  assert.equal(s.countdown, 3);
+  s = tick(s, 3000);
+  assert.equal(s.stage, 'active');
+});
+
 test('camera low-hips form gets five-second grace and then pauses; valid resumes', () => {
   let s = acknowledgeSafety(createInitialState({ target: 10 }));
   s = selectCell(s, availableCell(s));
+  s = confirmReadyPosition(s);
   s = tick(s, 3000);
   s = setForm(s, 'hips-low');
   s = tick(s, 4999);
@@ -63,7 +81,8 @@ test('camera low-hips form gets five-second grace and then pauses; valid resumes
 
 test('camera high-hips form enters the same correction grace state', () => {
   let s = acknowledgeSafety(createInitialState({ target: 10 }));
-  s = tick(selectCell(s, availableCell(s)), 3000);
+  s = confirmReadyPosition(selectCell(s, availableCell(s)));
+  s = tick(s, 3000);
   s = setForm(s, 'hips-high');
   assert.equal(s.form, 'hips-high');
   assert.equal(s.stage, 'grace');
@@ -71,7 +90,8 @@ test('camera high-hips form enters the same correction grace state', () => {
 
 test('camera tracking loss debounces for 500ms before pausing time', () => {
   let s = acknowledgeSafety(createInitialState({ target: 10 }));
-  s = tick(selectCell(s, availableCell(s)), 3000);
+  s = confirmReadyPosition(selectCell(s, availableCell(s)));
+  s = tick(s, 3000);
   s = tick(s, 1000);
   s = setForm(s, 'tracking');
   s = tick(s, 499);
@@ -117,7 +137,7 @@ test('a pixel selected before safety acknowledgement is reserved only after ackn
   assert.equal(s.requestedCell, cellId);
   assert.equal(s.cells[cellId].status, 'available');
   s = acknowledgeSafety(s);
-  assert.equal(s.stage, 'countdown');
+  assert.equal(s.stage, 'positioning');
   assert.equal(s.requestedCell, null);
   assert.equal(s.cells[cellId].status, 'pending');
 });

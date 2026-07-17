@@ -62,7 +62,8 @@ function startAttempt(state, cellId) {
   const cell = state.cells.find((item) => item.id === cellId);
   if (!cell || cell.status !== 'available') return state;
   const cells = state.cells.map((item) => item.id === cellId ? { ...item, status: 'pending' } : item);
-  return { ...state, stage: 'countdown', countdown: 3, creditedMs: 0, graceMs: 0, trackingMs: 0, form: 'valid', selectedCell: cellId, requestedCell: null, lastOutcome: null, cells, notice: '' };
+  const stage = state.mode === 'camera' ? 'positioning' : 'countdown';
+  return { ...state, stage, countdown: stage === 'countdown' ? 3 : 0, creditedMs: 0, graceMs: 0, trackingMs: 0, form: 'valid', selectedCell: cellId, requestedCell: null, lastOutcome: null, cells, notice: stage === 'positioning' ? 'GET IN POSITION' : '' };
 }
 
 export function selectCell(state, cellId) {
@@ -73,6 +74,11 @@ export function selectCell(state, cellId) {
     return { ...state, stage: 'safety', modeLocked: true, requestedCell: cellId, lastOutcome: null, notice: '' };
   }
   return startAttempt({ ...state, modeLocked: true }, cellId);
+}
+
+export function confirmReadyPosition(state) {
+  if (state.mode !== 'camera' || state.stage !== 'positioning' || state.selectedCell === null) return state;
+  return { ...state, stage: 'countdown', countdown: 3, form: 'valid', notice: 'HOLD READY' };
 }
 
 export function setForm(state, form) {
@@ -111,7 +117,7 @@ export function tick(state, milliseconds) {
 }
 
 export function endSession(state) {
-  if (!['countdown', 'active', 'grace', 'paused'].includes(state.stage)) return state;
+  if (!['positioning', 'countdown', 'active', 'grace', 'paused'].includes(state.stage)) return state;
   const cells = state.cells.map((item) => item.id === state.selectedCell ? { ...item, status: 'available' } : item);
   return { ...state, stage: 'ready', modeLocked: false, cells, selectedCell: null, countdown: 0, creditedMs: 0, graceMs: 0, trackingMs: 0, lastOutcome: 'failed', notice: 'SESSION RELEASED · PICK A NEW CELL TO RETRY' };
 }
@@ -121,6 +127,7 @@ export function reduce(state, action) {
     case 'choose-mode': return chooseMode(state, action.mode);
     case 'acknowledge-safety': return acknowledgeSafety(state);
     case 'select-cell': return selectCell(state, action.cellId);
+    case 'confirm-ready-position': return confirmReadyPosition(state);
     case 'set-form': return setForm(state, action.form);
     case 'tick': return tick(state, action.ms);
     case 'end-session': return endSession(state);

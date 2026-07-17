@@ -6,6 +6,7 @@
   type Pixel = { id: number; status: string };
   type Action = { type: string; mode?: string; cellId?: number; form?: string; ms?: number };
 
+  const CELEBRATION_FRAME_SECONDS = 0.09;
   const celebrationFrames = Array.from({ length: 15 }, (_, index) => {
     const frame = String(index + 1).padStart(2, '0');
     return {
@@ -17,26 +18,30 @@
   let state: any = createInitialState();
   let interval: ReturnType<typeof setInterval>;
 
-  $: active = ['countdown', 'active', 'grace', 'paused'].includes(state.stage);
+  $: active = ['positioning', 'countdown', 'active', 'grace', 'paused'].includes(state.stage);
   $: locked = state.stage !== 'ready';
   $: timerLabel = state.stage === 'countdown' ? String(Math.ceil(state.countdown)) : String(Math.floor(state.creditedMs / 1000)).padStart(2, '0');
-  $: showFormFeedback = state.mode === 'camera' && ['ready', 'countdown', 'active', 'grace', 'paused', 'complete'].includes(state.stage);
+  $: showFormFeedback = state.mode === 'camera' && ['ready', 'positioning', 'countdown', 'active', 'grace', 'paused', 'complete'].includes(state.stage);
   $: formFeedbackLabel = state.lastOutcome === 'complete'
     ? 'POWER UP +2'
     : state.lastOutcome === 'failed'
       ? 'TOO BAD!'
+      : state.stage === 'positioning'
+        ? 'GET IN POSITION'
+        : state.stage === 'countdown'
+          ? 'HOLD READY'
       : state.form === 'tracking'
         ? 'HEY, COME BACK!'
         : state.form === 'hips-low'
-          ? 'HIPS TOO LOW'
+          ? 'HIPS UP'
           : state.form === 'hips-high'
-            ? 'HIPS TOO HIGH'
+            ? 'HIPS DOWN'
             : state.stage === 'active'
               ? 'PERFECT FORM 🔥'
               : 'READY ?';
   $: graceSlots = state.lastOutcome === 'complete'
     ? 5
-    : state.lastOutcome === 'failed' || ['ready', 'countdown', 'paused'].includes(state.stage) || state.form === 'tracking'
+    : state.lastOutcome === 'failed' || ['ready', 'positioning', 'countdown', 'paused'].includes(state.stage) || state.form === 'tracking'
       ? 0
       : state.stage === 'grace'
         ? Math.max(0, 5 - Math.floor(state.graceMs / 1000))
@@ -59,6 +64,7 @@
   function chooseMode(mode: string) { dispatch({ type: 'choose-mode', mode }); }
   function skipToCelebration() {
     let next = state;
+    if (next.stage === 'positioning') next = reduce(next, { type: 'confirm-ready-position' });
     if (next.stage === 'countdown') next = reduce(next, { type: 'tick', ms: 3000 });
     if (['active', 'grace', 'paused'].includes(next.stage)) {
       if (next.mode === 'camera') next = reduce(next, { type: 'set-form', form: 'valid' });
@@ -124,27 +130,43 @@
               src={frame.src}
               alt={frame.alt}
               aria-hidden={index < celebrationFrames.length - 1 ? 'true' : undefined}
-              style={`--celebration-delay:${index * 0.16}s`}
+              style={`--celebration-delay:${index * CELEBRATION_FRAME_SECONDS}s;--celebration-duration:${celebrationFrames.length * CELEBRATION_FRAME_SECONDS}s`}
             />
           {/each}
         </div>
       {:else}
-        <img class={pose.kind} src={pose.src} alt={pose.alt} />
+        <div class="pose-visual">
+          <img class={pose.kind} src={pose.src} alt={pose.alt} />
+          {#if pose.kind === 'hips-low' || pose.kind === 'hips-high'}
+            <span class="body-region-highlight" aria-hidden="true"></span>
+          {/if}
+        </div>
       {/if}
     </section>
     {#if dev && active && state.mode === 'camera' && state.stage !== 'countdown'}
       <aside class="dev-tools" aria-label="Developer form testing controls">
         <strong>DEV TOOLS</strong>
-        <button class="btn" on:click={() => dispatch({ type: 'set-form', form: 'valid' })}>VALID FORM</button>
-        <button class="btn" on:click={() => dispatch({ type: 'set-form', form: 'hips-low' })}>HIPS TOO LOW</button>
-        <button class="btn" on:click={() => dispatch({ type: 'set-form', form: 'hips-high' })}>HIPS TOO HIGH</button>
-        <button class="btn" on:click={() => dispatch({ type: 'set-form', form: 'tracking' })}>MOVE OUT OF FRAME</button>
+        {#if state.stage === 'positioning'}
+          <button class="btn" on:click={() => dispatch({ type: 'confirm-ready-position' })}>READY POSITION</button>
+        {:else}
+          <button class="btn" on:click={() => dispatch({ type: 'set-form', form: 'valid' })}>VALID FORM</button>
+          <button class="btn" on:click={() => dispatch({ type: 'set-form', form: 'hips-low' })}>HIPS TOO LOW</button>
+          <button class="btn" on:click={() => dispatch({ type: 'set-form', form: 'hips-high' })}>HIPS TOO HIGH</button>
+          <button class="btn" on:click={() => dispatch({ type: 'set-form', form: 'tracking' })}>MOVE OUT OF FRAME</button>
+        {/if}
         <button class="btn" on:click={skipToCelebration}>SKIP TO CELEBRATION</button>
       </aside>
     {/if}
   </div>
   {#if showFormFeedback}
     <section class="form-feedback" aria-live="polite" aria-label="Camera form feedback">
+      <div class="correction-arrow-slot" aria-hidden="true">
+        {#if state.form === 'hips-low' && (state.stage === 'grace' || state.stage === 'paused')}
+          <span class="pixel-correction-arrow"></span>
+        {:else if state.form === 'hips-high' && (state.stage === 'grace' || state.stage === 'paused')}
+          <span class="pixel-correction-arrow down"></span>
+        {/if}
+      </div>
       <div class="form-feedback-label">{formFeedbackLabel}</div>
       <div class="grace-cells" aria-label={`${graceSlots} of 5 form grace cells remaining`}>
         {#each Array(5) as _, index}
@@ -194,14 +216,16 @@
   .status-row { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }.status-group { display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
   .chip { display:inline-flex; align-items:center; min-height:38px; padding:9px 13px; border:1px solid var(--line); border-radius:999px; background:rgba(255,250,245,.88); color:var(--muted); font:700 11px/1 var(--mono); letter-spacing:.02em; }
   .hero { width:min(650px,100%); margin:58px auto 0; text-align:center; }.brand-title { margin:0 0 10px; color:var(--coral); font:700 clamp(30px,6vw,52px)/.95 var(--mono); letter-spacing:.04em; }.mode-selector { display:flex; justify-content:center; gap:10px; }.mode-chip { min-height:34px; background:transparent; cursor:pointer; }.mode-chip.selected { border-color:var(--coral); color:var(--coral-dark); box-shadow:0 0 0 2px rgba(255,90,54,.12); }.mode-chip:disabled { cursor:not-allowed; opacity:.6; }.mode-chip.selected:disabled { opacity:1; }.timer { margin:0; font:700 clamp(52px,11vw,108px)/.9 var(--mono); letter-spacing:-.08em; }.timer small { font-size:.22em; letter-spacing:0; margin-left:8px; color:var(--muted); }.validation { display:inline-flex; align-items:center; gap:8px; margin-top:16px; padding:9px 13px; border:1px solid var(--line); border-radius:999px; color:var(--muted); background:rgba(255,250,245,.85); font:700 10px var(--mono); }.selection-chip { display:flex; width:max-content; margin:16px auto 0; background:transparent; }
-  .pose-stage { position:relative; display:grid; align-items:center; width:min(900px,100%); min-height:210px; margin:22px auto 0; }.pose-slot { width:min(560px,100%); margin:0 auto; text-align:center; }.pose-slot img { display:block; width:100%; height:auto; max-height:180px; object-fit:contain; image-rendering:pixelated; }.pose-slot img.hips-low { transform:scale(.68); transform-origin:center; }.pose-slot img.hips-high { transform:scale(.7); transform-origin:center; }.pose-slot img.exhausted { max-height:105px; }.celebration-sequence { position:relative; width:100%; height:180px; }.pose-slot img.celebration-frame { position:absolute; inset:0; width:100%; height:100%; max-height:none; object-fit:contain; opacity:0; animation:celebration-frame-slot 2.4s steps(1,end) forwards; animation-delay:var(--celebration-delay); }.pose-slot img.celebration-frame.celebration-final { animation:celebration-final-frame 1ms linear forwards; animation-delay:var(--celebration-delay); }.form-feedback { margin:10px auto 0; text-align:center; }.form-feedback-label { color:var(--ink); font:700 12px/1 var(--mono); letter-spacing:.04em; }.grace-cells { display:flex; justify-content:center; gap:12px; margin-top:12px; }.grace-cell { width:27px; height:27px; border:2px solid var(--coral); border-radius:5px; background:transparent; box-sizing:border-box; }.grace-cell.filled { background:var(--coral); box-shadow:inset 0 0 0 1px rgba(255,255,255,.2); }.privacy-note { margin:10px auto 0; color:var(--muted); font:700 10px var(--mono); text-align:center; }
+  .pose-stage { position:relative; display:grid; align-items:center; width:min(900px,100%); min-height:210px; margin:22px auto 0; }.pose-slot { width:min(560px,100%); margin:0 auto; text-align:center; }.pose-slot img { display:block; width:100%; height:auto; max-height:180px; object-fit:contain; image-rendering:pixelated; }.pose-slot img.hips-low { transform:scale(.68); transform-origin:center; }.pose-slot img.hips-high { transform:scale(.7); transform-origin:center; }.pose-slot img.exhausted { max-height:105px; }.celebration-sequence { position:relative; width:100%; height:180px; }.pose-slot img.celebration-frame { position:absolute; inset:0; width:100%; height:100%; max-height:none; object-fit:contain; opacity:0; animation:celebration-frame-slot var(--celebration-duration) steps(1,end) forwards; animation-delay:var(--celebration-delay); }.pose-slot img.celebration-frame.celebration-final { animation:celebration-final-frame 1ms linear forwards; animation-delay:var(--celebration-delay); }.form-feedback { margin:10px auto 0; text-align:center; }.form-feedback-label { color:var(--ink); font:700 12px/1 var(--mono); letter-spacing:.04em; }.grace-cells { display:flex; justify-content:center; gap:12px; margin-top:12px; }.grace-cell { width:27px; height:27px; border:2px solid var(--coral); border-radius:5px; background:transparent; box-sizing:border-box; }.grace-cell.filled { background:var(--coral); box-shadow:inset 0 0 0 1px rgba(255,255,255,.2); }.privacy-note { margin:10px auto 0; color:var(--muted); font:700 10px var(--mono); text-align:center; }
+  .pose-visual { position:relative; width:100%; height:180px; }.pose-visual > img { height:100%; max-height:none; }.body-region-highlight { position:absolute; z-index:2; top:54%; left:48%; width:52px; height:52px; transform:translate(-50%,-50%); border:3px solid var(--coral); border-radius:50%; background:rgba(255,90,54,.24); box-shadow:0 0 0 8px rgba(255,90,54,.12); animation:region-pulse .8s steps(2,end) infinite; pointer-events:none; }.correction-arrow-slot { display:flex; align-items:center; justify-content:center; height:54px; }.pixel-correction-arrow { position:relative; display:block; width:48px; height:36px; transform:rotate(-90deg); transform-origin:center; filter:drop-shadow(2px 2px 0 rgba(255,90,54,.22)); image-rendering:pixelated; }.pixel-correction-arrow::before,.pixel-correction-arrow::after { content:""; position:absolute; display:block; }.pixel-correction-arrow::before { inset:0; background:var(--coral-dark); clip-path:polygon(0 22%,50% 22%,50% 0,67% 0,67% 11%,75% 11%,75% 22%,83% 22%,83% 33%,92% 33%,92% 44%,100% 44%,100% 56%,92% 56%,92% 67%,83% 67%,83% 78%,75% 78%,75% 89%,67% 89%,67% 100%,50% 100%,50% 78%,0 78%); }.pixel-correction-arrow::after { inset:4px; background:linear-gradient(180deg,var(--peach) 0 34%,#ff9c68 34% 64%,var(--coral) 64% 82%,var(--coral-dark) 82% 100%); clip-path:polygon(0 21%,50% 21%,50% 0,65% 0,65% 11%,73% 11%,73% 21%,81% 21%,81% 32%,89% 32%,89% 43%,100% 43%,100% 57%,89% 57%,89% 68%,81% 68%,81% 79%,73% 79%,73% 89%,65% 89%,65% 100%,50% 100%,50% 79%,0 79%); }.pixel-correction-arrow.down { transform:rotate(90deg); }
   .modal-backdrop { position:fixed; inset:0; z-index:20; display:grid; place-items:center; padding:24px; overflow-y:auto; background:rgba(255,244,234,.72); backdrop-filter:blur(5px); }.panel { margin:26px auto 0; width:min(660px,100%); border:1px solid var(--line); border-radius:16px; background:rgba(255,250,245,.96); padding:18px; box-shadow:0 18px 60px rgba(120,61,35,.18); }.panel.modal { width:min(620px,calc(100vw - 48px)); max-height:calc(100vh - 48px); margin:0; overflow-y:auto; }.panel h2 { margin:0 0 8px; font-size:18px; }.panel p { margin:7px 0; color:var(--muted); line-height:1.45; font-size:14px; }.btn { border:1px solid var(--coral); border-radius:999px; padding:10px 15px; background:transparent; color:var(--coral-dark); font:700 11px var(--mono); letter-spacing:.02em; }.btn:hover,.btn.primary { background:var(--coral); color:#fff; }.safety { text-align:left; }.safety h2 { font:700 14px var(--mono); letter-spacing:.06em; }.safety strong { color:var(--coral-dark); }.safety-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:14px; }
   .canvas-wrap { position:relative; width:min(760px,100%); margin:38px auto 0; }.canvas-meta { display:flex; justify-content:flex-end; align-items:baseline; margin-bottom:4px; }.canvas-meta span { color:var(--muted); font:700 10px var(--mono); }
   .canvas { display:grid; grid-template-columns:repeat(var(--art-width),1fr); gap:2px; width:min(720px,100%); margin:0 auto; padding:18px; border:0; background:transparent; }.cell { aspect-ratio:1; min-width:0; border:0; border-radius:1px; background:transparent; padding:0; transition:transform .1s ease,filter .1s; }.cell.target { border:1px solid rgba(255,164,127,.68); background:rgba(255,228,210,.48); }.cell.target:not(:disabled):hover,.cell.target:not(:disabled):focus-visible { transform:scale(1.16); filter:brightness(.96); outline:2px solid var(--coral); outline-offset:1px; }.cell.locked { border-color:var(--coral); background:var(--coral); }.cell.pending,.cell.other { border-color:var(--coral); background:var(--coral); animation:pulse 1.25s ease-in-out infinite; box-shadow:0 0 0 4px rgba(255,90,54,.16); }.cell.other { opacity:.65; animation-delay:-.45s; transform:scale(.72); }.cell.empty { pointer-events:none; }
   @keyframes pulse { 50% { transform:scale(1.12); box-shadow:0 0 0 10px rgba(255,90,54,0); } }.controls { display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:18px; }.dev-tools { position:absolute; top:50%; right:0; transform:translateY(-50%); display:flex; width:150px; flex-direction:column; gap:8px; padding:12px; border:1px dashed var(--coral); border-radius:12px; background:rgba(255,250,245,.96); box-shadow:0 10px 30px rgba(120,61,35,.12); }.dev-tools strong { color:var(--muted); font:700 10px var(--mono); text-align:center; letter-spacing:.08em; }.dev-tools .btn { padding:8px 9px; font-size:9px; }
   @media(max-width:900px){.pose-stage{display:block;min-height:0}.dev-tools{position:static;transform:none;width:min(560px,100%);margin:14px auto 0;flex-direction:row;flex-wrap:wrap;justify-content:center}.dev-tools strong{width:100%}}
   @media(max-width:600px){.page{padding:20px 15px 32px}.status-row{align-items:flex-start}.status-row .mode-selector{gap:5px}.chip{font-size:9px;min-height:32px;padding:8px 9px}.hero{margin-top:44px}.modal-backdrop{padding:15px}.panel{padding:15px}.panel.modal{width:min(620px,calc(100vw - 30px));max-height:calc(100vh - 30px)}.canvas{gap:1px;padding:8px}.grace-cells{gap:8px}.grace-cell{width:24px;height:24px}.privacy-note{font-size:8px}}
-  @media(prefers-reduced-motion:reduce){.cell.pending,.cell.other{animation:none;box-shadow:0 0 0 7px rgba(255,90,54,.16)}.pose-slot img.celebration-frame{display:none;animation:none}.pose-slot img.celebration-frame:last-child{display:block;opacity:1}}
+  @media(prefers-reduced-motion:reduce){.cell.pending,.cell.other{animation:none;box-shadow:0 0 0 7px rgba(255,90,54,.16)}.body-region-highlight{animation:none}.pose-slot img.celebration-frame{display:none;animation:none}.pose-slot img.celebration-frame:last-child{display:block;opacity:1}}
+  @keyframes region-pulse { 50% { transform:translate(-50%,-50%) scale(1.18); box-shadow:0 0 0 14px rgba(255,90,54,0); } }
   @keyframes celebration-frame-slot { 0%,6.666% { opacity:1; } 6.667%,100% { opacity:0; } }
   @keyframes celebration-final-frame { to { opacity:1; } }
 </style>
