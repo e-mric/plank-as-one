@@ -4,7 +4,7 @@ import { createInitialState, chooseMode, acknowledgeSafety, selectCell, confirmR
 
 const availableCell = (state, offset = 0) => state.cells.filter((cell) => cell.status === 'available')[offset].id;
 
-test('shared canvas is the PLANK AS ONE artwork mask, not a generic grid', () => {
+test('shared canvas is the OPENAI BUILD WEEK artwork mask, not a generic grid', () => {
   const state = createInitialState();
   assert.equal(ARTWORK_WIDTH, 35);
   assert.equal(ARTWORK_HEIGHT, 23);

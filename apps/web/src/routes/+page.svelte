@@ -337,7 +337,7 @@
   <section class="canvas-wrap" aria-label="Shared canvas">
     <div class="canvas-meta"><span>{state.cells.filter((c: Pixel) => c.status === 'locked').length} PIXELS LIVE · {state.liveCount} ACTIVE</span></div>
 
-    <div class="canvas" style={`--art-width:${GRID_WIDTH}`} role="grid" aria-label="PLANK AS ONE shared pixel artwork. Select an outlined target pixel.">
+    <div class="canvas" style={`--art-width:${GRID_WIDTH}`} role="grid" aria-label="OPENAI BUILD WEEK shared pixel artwork. Select an outlined target pixel.">
       {#each state.cells as cell (cell.id)}
         <button class:target={cell.target} class:empty={!cell.target} class:locked={cell.status === 'locked'} class:pending={cell.status === 'pending'} class:other={cell.status === 'other'} class="cell" disabled={cell.status !== 'available' || locked} on:click={() => dispatch({ type: 'select-cell', cellId: cell.id })} aria-label={cell.target ? `Artwork pixel ${cell.id + 1}, ${cell.status}` : 'Artwork background'} aria-pressed={cell.status === 'pending'}></button>
       {/each}
