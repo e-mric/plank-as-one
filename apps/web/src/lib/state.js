@@ -30,6 +30,7 @@ export function createInitialState(overrides = {}) {
     graceMs: 0,
     trackingMs: 0,
     form: 'valid',
+    correction: null,
     selectedCell: null,
     requestedCell: null,
     cells,
@@ -63,7 +64,7 @@ function startAttempt(state, cellId) {
   if (!cell || cell.status !== 'available') return state;
   const cells = state.cells.map((item) => item.id === cellId ? { ...item, status: 'pending' } : item);
   const stage = state.mode === 'camera' ? 'positioning' : 'countdown';
-  return { ...state, stage, countdown: stage === 'countdown' ? 3 : 0, creditedMs: 0, graceMs: 0, trackingMs: 0, form: 'valid', selectedCell: cellId, requestedCell: null, lastOutcome: null, cells, notice: stage === 'positioning' ? 'GET IN POSITION' : '' };
+  return { ...state, stage, countdown: stage === 'countdown' ? 3 : 0, creditedMs: 0, graceMs: 0, trackingMs: 0, form: 'valid', correction: null, selectedCell: cellId, requestedCell: null, lastOutcome: null, cells, notice: stage === 'positioning' ? 'GET IN POSITION' : '' };
 }
 
 export function selectCell(state, cellId) {
@@ -81,13 +82,19 @@ export function confirmReadyPosition(state) {
   return { ...state, stage: 'countdown', countdown: 3, form: 'valid', notice: 'HOLD READY' };
 }
 
-export function setForm(state, form) {
+export function setForm(state, form, correction = null) {
   if (!['valid', 'invalid', 'hips-low', 'hips-high', 'tracking'].includes(form)) return state;
-  if (state.stage !== 'active' && state.stage !== 'grace' && state.stage !== 'paused') return { ...state, form };
-  if (form === 'valid') return { ...state, form, stage: 'active', graceMs: 0, trackingMs: 0, notice: '' };
-  if (form === 'tracking') return { ...state, form, trackingMs: 0, notice: 'HEY, COME BACK!' };
+  if (state.stage !== 'active' && state.stage !== 'grace' && state.stage !== 'paused') return { ...state, form, correction };
+  if (form === 'valid') return { ...state, form, correction: null, stage: 'active', graceMs: 0, trackingMs: 0, notice: '' };
+  if (form === 'tracking') return { ...state, form, correction, trackingMs: 0, notice: 'HEY, COME BACK!' };
   const notice = form === 'hips-low' ? 'HIPS TOO LOW' : form === 'hips-high' ? 'HIPS TOO HIGH' : 'CORRECT FORM';
-  return { ...state, form, stage: 'grace', graceMs: 0, trackingMs: 0, notice };
+  return { ...state, form, correction, stage: 'grace', graceMs: 0, trackingMs: 0, notice };
+}
+
+export function applyPoseUpdate(state, { form, correction = null, ready = false } = {}) {
+  if (ready && state.stage === 'positioning') return confirmReadyPosition(state);
+  if (state.mode !== 'camera' || !form) return state;
+  return setForm(state, form, correction);
 }
 
 export function tick(state, milliseconds) {
@@ -110,7 +117,7 @@ export function tick(state, milliseconds) {
   if (creditedMs < state.target * 1000) return { ...state, creditedMs };
   const cells = state.cells.map((item) => item.id === state.selectedCell ? { ...item, status: 'locked' } : item);
   return {
-    ...state, stage: 'complete', creditedMs: state.target * 1000, cells,
+    ...state, stage: 'complete', creditedMs: state.target * 1000, correction: null, cells,
     completions: state.completions + 1, streak: state.streak + 1, todayCount: state.todayCount + 1,
     target: Math.min(120, state.target + 2), completionMethod: state.mode, lastOutcome: 'complete', notice: 'PIXEL COMMITTED · NICE WORK',
   };
@@ -119,7 +126,7 @@ export function tick(state, milliseconds) {
 export function endSession(state) {
   if (!['positioning', 'countdown', 'active', 'grace', 'paused'].includes(state.stage)) return state;
   const cells = state.cells.map((item) => item.id === state.selectedCell ? { ...item, status: 'available' } : item);
-  return { ...state, stage: 'ready', modeLocked: false, cells, selectedCell: null, countdown: 0, creditedMs: 0, graceMs: 0, trackingMs: 0, lastOutcome: 'failed', notice: 'SESSION RELEASED · PICK A NEW CELL TO RETRY' };
+  return { ...state, stage: 'ready', modeLocked: false, cells, selectedCell: null, countdown: 0, creditedMs: 0, graceMs: 0, trackingMs: 0, correction: null, lastOutcome: 'failed', notice: 'SESSION RELEASED · PICK A NEW CELL TO RETRY' };
 }
 
 export function reduce(state, action) {
@@ -128,7 +135,8 @@ export function reduce(state, action) {
     case 'acknowledge-safety': return acknowledgeSafety(state);
     case 'select-cell': return selectCell(state, action.cellId);
     case 'confirm-ready-position': return confirmReadyPosition(state);
-    case 'set-form': return setForm(state, action.form);
+    case 'set-form': return setForm(state, action.form, action.correction);
+    case 'pose-update': return applyPoseUpdate(state, action);
     case 'tick': return tick(state, action.ms);
     case 'end-session': return endSession(state);
     default: return state;

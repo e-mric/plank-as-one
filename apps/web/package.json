@@ -7,7 +7,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json",
-    "test": "node --test test/state.test.mjs"
+    "test": "node --test test/*.test.mjs"
   },
   "devDependencies": {
     "@fontsource/pixelify-sans": "latest",
