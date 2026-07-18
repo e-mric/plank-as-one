@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createInitialState, chooseMode, acknowledgeSafety, selectCell, confirmReadyPosition, tick, setForm, endSession, ARTWORK_WIDTH, ARTWORK_HEIGHT } from '../state.js';
+import { createInitialState, chooseMode, acknowledgeSafety, selectCell, confirmReadyPosition, tick, setForm, endSession, reduce, ARTWORK_WIDTH, ARTWORK_HEIGHT } from '../state.js';
 
 const availableCell = (state, offset = 0) => state.cells.filter((cell) => cell.status === 'available')[offset].id;
 
@@ -140,4 +140,17 @@ test('a pixel selected before safety acknowledgement is reserved only after ackn
   assert.equal(s.stage, 'positioning');
   assert.equal(s.requestedCell, null);
   assert.equal(s.cells[cellId].status, 'pending');
+});
+
+test('pose updates preserve the selected correction through the grace pause', () => {
+  let s = acknowledgeSafety(createInitialState({ target: 10 }));
+  s = confirmReadyPosition(selectCell(s, availableCell(s)));
+  s = tick(s, 3000);
+  const correction = { kind: 'hips-low', label: 'HIPS UP' };
+  s = reduce(s, { type: 'pose-update', form: 'hips-low', correction });
+  assert.equal(s.stage, 'grace');
+  assert.deepEqual(s.correction, correction);
+  s = reduce(s, { type: 'pose-update', form: 'valid' });
+  assert.equal(s.stage, 'active');
+  assert.equal(s.correction, null);
 });
