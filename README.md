@@ -2,7 +2,7 @@
 
 Plank As One turns a short plank into a shared daily ritual: complete one challenge, earn one pixel, and help reveal a collective artwork. The Build Week prototype combines a focused SvelteKit experience with browser-only MoveNet pose estimation, deterministic form rules, safety guidance, audio cues, and a pixel-reservation state machine.
 
-The current shared artwork spells **OPENAI BUILD WEEK**. Community activity, existing contributions, streaks, and daily counts are represented by local mock data in this prototype; they are not yet synchronized between browsers.
+The current shared artwork spells **OPENAI BUILD WEEK**. With Supabase configured, the shared contribution and active-participant counts update from authoritative snapshots and realtime events. The reset countdown is clock-driven, while streak history is stored in the current browser profile.
 
 **Naming:** **Plank As One** is the product. **OPENAI BUILD WEEK** is the limited-edition artwork currently being revealed on its canvas, not a second product name.
 
@@ -31,7 +31,7 @@ This is general fitness guidance, not medical advice or a guarantee of safe or c
 
 ## Prototype limitations
 
-- Without the two public Supabase environment variables, canvas contents, active-participant count, daily count, and streak are initialized from visibly labelled local mock data; local progress does not persist across refreshes or devices.
+- Without the two public Supabase environment variables, the canvas runs locally. Browser streak history persists across refreshes in that browser profile but does not synchronize across devices.
 - The repository includes the shared-canvas backend migration and client integration, but a deployment cannot claim `SHARED LIVE` until a Supabase project is provisioned and the two-browser verification in `supabase/README.md` passes.
 - Streak and progressive target duration remain local prototype values even when the canvas itself is shared. There is no archive or Leader workflow yet.
 - The production guided demo is intentionally simulated and does not validate a participant's real pose.

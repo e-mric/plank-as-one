@@ -9,6 +9,7 @@
   import { CAMERA_CONSTRAINTS, describeFraming, getCameraErrorMessage } from '$lib/pose/setup-machine.js';
   import { createAudioFeedback } from '$lib/pose/audio-feedback.js';
   import { analyzePoseFrame, resetPoseAnalyzer } from '$lib/pose/engine.js';
+  import { addCompletionDay, calculateStreak, COMPLETION_DAYS_STORAGE_KEY, formatResetCountdown, normalizeCompletionDays } from '$lib/live-status.js';
 
   type Pixel = { id: number; status: string };
   type Action = { type: string; mode?: string; cellId?: number; form?: string; ms?: number; correction?: any; ready?: boolean };
@@ -46,6 +47,9 @@
   let sharedStatus = 'local';
   let canvasNotice = '';
   let heartbeatInterval: ReturnType<typeof setInterval>;
+  let resetInterval: ReturnType<typeof setInterval>;
+  let liveResetLabel = '--:--:--';
+  let demoResetLabel = '--:--:--';
   let poseDebugSession: any = null;
   let poseDebugStatus: any = { active: false, captureCount: 0, outputMode: '', lastDiagnostic: '', lastFile: '', error: '' };
 
@@ -58,6 +62,7 @@
       : state.lastOutcome === 'failed'
         ? 'SELECT YOUR PIXEL AGAIN'
         : 'SELECT YOUR PIXEL';
+  $: resetLabel = guidedDemo ? demoResetLabel : liveResetLabel;
   $: locked = state.stage !== 'ready' || sessionComplete;
   $: timerLabel = state.stage === 'countdown' ? String(Math.ceil(state.countdown)) : String(Math.floor(state.creditedMs / 1000)).padStart(2, '0');
   $: trackingVisible = state.form === 'tracking' && (state.trackingMs >= 500 || state.stage === 'paused');
@@ -121,6 +126,7 @@
     }
     if (state.stage === 'complete' && previous.stage !== 'complete') {
       stopCamera();
+      if (!state.demo) recordLocalCompletion();
       void initializeAudio().then(() => audio.complete());
       if (!guidedDemo && sharedReady && sharedService && state.selectedCell !== null) {
         void commitSharedPixel(state.selectedCell, state.completionMethod);
@@ -136,6 +142,28 @@
 
   function activeStage(stage: string) {
     return ['positioning', 'countdown', 'active', 'grace', 'paused'].includes(stage);
+  }
+
+  function readCompletionDays() {
+    try {
+      return normalizeCompletionDays(JSON.parse(localStorage.getItem(COMPLETION_DAYS_STORAGE_KEY) || '[]'));
+    } catch {
+      return [];
+    }
+  }
+
+  function syncLocalStreak() {
+    state = { ...state, streak: calculateStreak(readCompletionDays()) };
+  }
+
+  function recordLocalCompletion() {
+    const completionDays = addCompletionDay(readCompletionDays());
+    try {
+      localStorage.setItem(COMPLETION_DAYS_STORAGE_KEY, JSON.stringify(completionDays));
+    } catch {
+      // Streak persistence is best-effort when browser storage is unavailable.
+    }
+    state = { ...state, streak: calculateStreak(completionDays) };
   }
 
   async function ensurePoseDebugSession() {
@@ -421,6 +449,7 @@
     if (dev && poseDebugSession?.active) void stopPoseDebugLogging('guided-demo-started');
     stopCamera();
     if (withAudio) void initializeAudio();
+    demoResetLabel = liveResetLabel;
     guidedDemo = true;
     const runId = ++demoRunId;
     state = createGuidedDemoState(source);
@@ -442,11 +471,15 @@
     const restartCamera = state.mode === 'camera' && state.stage === 'positioning';
     demoReturnState = null;
     guidedDemo = false;
+    demoResetLabel = '--:--:--';
     demoStep = '';
     if (restartCamera) void startCamera();
   }
 
   onMount(() => {
+    syncLocalStreak();
+    liveResetLabel = formatResetCountdown();
+    resetInterval = setInterval(() => { liveResetLabel = formatResetCountdown(); }, 1000);
     if (dev) void ensurePoseDebugSession().catch((error: any) => {
       poseDebugStatus = { ...poseDebugStatus, error: error?.message || 'Visual logger failed to load' };
     });
@@ -476,7 +509,7 @@
     };
     document.addEventListener('visibilitychange', abandonHonor);
     if (new URL(window.location.href).searchParams.get('demo') === '1') launchGuidedDemo(false);
-    return () => { demoRunId += 1; clearInterval(interval); clearInterval(heartbeatInterval); document.removeEventListener('visibilitychange', abandonHonor); if (dev && poseDebugSession?.active) void poseDebugSession.stop('page-unload'); stopCamera(); audio.dispose(); void sharedService?.disconnect(); };
+    return () => { demoRunId += 1; clearInterval(interval); clearInterval(heartbeatInterval); clearInterval(resetInterval); document.removeEventListener('visibilitychange', abandonHonor); if (dev && poseDebugSession?.active) void poseDebugSession.stop('page-unload'); stopCamera(); audio.dispose(); void sharedService?.disconnect(); };
   });
 </script>
 
@@ -512,7 +545,7 @@
         on:click={() => chooseMode('honor')}
       >Honor mode</button>
     </div>
-    <div class="status-group"><span class="chip"><b>{state.todayCount}</b>&nbsp; TODAY</span><span class="chip">RESET&nbsp; 05:42</span><span class="chip">STREAK&nbsp; <b>{state.streak}</b>&nbsp; DAYS</span></div>
+    <div class="status-group"><span class="chip"><b>{state.todayCount}</b>&nbsp; TODAY</span><span class="chip">RESET&nbsp; {resetLabel}</span><span class="chip">STREAK&nbsp; <b>{state.streak}</b>&nbsp; DAYS</span></div>
   </header>
 
   <section class="hero" aria-label="Daily plank challenge">
