@@ -45,6 +45,8 @@
   let sharedOwnedCellId: number | null = null;
   let sharedStatus = 'local';
   let heartbeatInterval: ReturnType<typeof setInterval>;
+  let poseDebugSession: any = null;
+  let poseDebugStatus: any = { active: false, captureCount: 0, outputMode: '', lastDiagnostic: '', lastFile: '', error: '' };
 
   $: active = ['positioning', 'countdown', 'active', 'grace', 'paused'].includes(state.stage);
   $: locked = state.stage !== 'ready';
@@ -104,7 +106,10 @@
     const previous = state;
     state = reduce(state, action);
     if (!guidedDemo && previous.stage !== state.stage && state.stage === 'positioning') void startCamera();
-    if (previous.mode === 'camera' && activeStage(previous.stage) && !activeStage(state.stage)) stopCamera();
+    if (previous.mode === 'camera' && activeStage(previous.stage) && !activeStage(state.stage)) {
+      stopCamera();
+      if (dev && poseDebugSession?.active) void stopPoseDebugLogging(state.stage === 'complete' ? 'workout-complete' : 'session-ended');
+    }
     if (state.stage === 'complete' && previous.stage !== 'complete') {
       stopCamera();
       void initializeAudio().then(() => audio.complete());
@@ -122,6 +127,39 @@
 
   function activeStage(stage: string) {
     return ['positioning', 'countdown', 'active', 'grace', 'paused'].includes(stage);
+  }
+
+  async function ensurePoseDebugSession() {
+    if (!dev) return null;
+    if (!poseDebugSession) {
+      const { createPoseDebugSession } = await import('$lib/pose/debug-session.js');
+      poseDebugSession = createPoseDebugSession({
+        minIntervalMs: 2500,
+        maxCaptures: 90,
+        onUpdate: (status: any = {}) => { poseDebugStatus = { ...status }; },
+      });
+      poseDebugStatus = { ...poseDebugSession.status };
+    }
+    return poseDebugSession;
+  }
+
+  async function startPoseDebugLogging() {
+    try {
+      const session = await ensurePoseDebugSession();
+      if (session) await session.start();
+    } catch (error: any) {
+      poseDebugStatus = { ...poseDebugStatus, active: false, error: error?.message || 'Unable to start visual logging' };
+    }
+  }
+
+  async function stopPoseDebugLogging(reason = 'manual') {
+    if (!poseDebugSession?.active) return;
+    await poseDebugSession.stop(reason);
+  }
+
+  async function capturePoseDebugNow() {
+    if (!poseDebugSession?.active) return;
+    await poseDebugSession.captureNow();
   }
 
   function describeSharedFailure(reason = '') {
@@ -229,28 +267,44 @@
       videoEl.srcObject = cameraStream;
       await videoEl.play();
       detector = await createMoveNetDetector({ onStatus: (status: string) => { cameraStatus = status; } });
+      const inferenceVideo = videoEl;
       stopInference = startPoseInference({
-        video: videoEl,
+        video: inferenceVideo,
         detector,
-        onPose: handlePose,
-        onError: () => { cameraStatus = 'error'; cameraMessage = 'POSE TRACKING UNAVAILABLE'; },
+        onPose: (poses: any[], now: number) => handlePose(poses, now, inferenceVideo),
+        onError: () => {
+          cameraStatus = 'error';
+          cameraMessage = 'POSE TRACKING UNAVAILABLE';
+          if (dev && poseDebugSession?.active) void stopPoseDebugLogging('inference-error');
+        },
       });
       cameraStatus = 'ready';
     } catch (error) {
       cameraStatus = 'error';
       cameraMessage = getCameraErrorMessage(error);
+      if (dev && poseDebugSession?.active) void stopPoseDebugLogging('camera-error');
       stopCamera(false);
     } finally {
       cameraStarting = false;
     }
   }
 
-  function handlePose(poses: any[], now: number) {
-    const result = analyzePoseFrame(poses?.[0], {
-      width: videoEl?.videoWidth || 1,
-      height: videoEl?.videoHeight || 1,
+  function handlePose(poses: any[], now: number, inferenceVideo: HTMLVideoElement) {
+    const poseResult = poses?.[0];
+    const result = analyzePoseFrame(poseResult, {
+      width: inferenceVideo.videoWidth || 1,
+      height: inferenceVideo.videoHeight || 1,
       now,
     });
+    if (dev && poseDebugSession?.active) {
+      void poseDebugSession.observe({
+        video: inferenceVideo,
+        pose: poseResult,
+        result,
+        stage: state.stage,
+        frameTimeMs: now,
+      });
+    }
     cameraMessage = result.setupMessage || describeFraming(result.quality);
     if (result.quality?.tracked && result.setupReady) cameraStatus = 'ready';
     if (state.stage === 'positioning') {
@@ -353,6 +407,7 @@
   function launchGuidedDemo(withAudio: boolean) {
     const source = guidedDemo && demoReturnState ? demoReturnState : state;
     if (!guidedDemo) demoReturnState = state;
+    if (dev && poseDebugSession?.active) void stopPoseDebugLogging('guided-demo-started');
     stopCamera();
     if (withAudio) void initializeAudio();
     guidedDemo = true;
@@ -381,6 +436,9 @@
   }
 
   onMount(() => {
+    if (dev) void ensurePoseDebugSession().catch((error: any) => {
+      poseDebugStatus = { ...poseDebugStatus, error: error?.message || 'Visual logger failed to load' };
+    });
     const sharedConfig = getSharedCanvasConfig(env);
     if (sharedConfig) {
       sharedService = createSharedCanvasService(sharedConfig);
@@ -407,7 +465,7 @@
     };
     document.addEventListener('visibilitychange', abandonHonor);
     if (new URL(window.location.href).searchParams.get('demo') === '1') launchGuidedDemo(false);
-    return () => { demoRunId += 1; clearInterval(interval); clearInterval(heartbeatInterval); document.removeEventListener('visibilitychange', abandonHonor); stopCamera(); audio.dispose(); void sharedService?.disconnect(); };
+    return () => { demoRunId += 1; clearInterval(interval); clearInterval(heartbeatInterval); document.removeEventListener('visibilitychange', abandonHonor); if (dev && poseDebugSession?.active) void poseDebugSession.stop('page-unload'); stopCamera(); audio.dispose(); void sharedService?.disconnect(); };
   });
 </script>
 
@@ -497,7 +555,19 @@
     </section>
     {#if dev && !guidedDemo && active && state.mode === 'camera' && state.stage !== 'countdown'}
       <aside class="dev-tools" aria-label="Developer form testing controls">
-        <strong>DEV TOOLS</strong>
+        <strong>POSE VISUAL LOG</strong>
+        {#if poseDebugStatus.active}
+          <span class="dev-log-status">REC {poseDebugStatus.captureCount} · {poseDebugStatus.outputMode === 'directory' ? 'LOCAL FOLDER' : 'DOWNLOADS'}</span>
+          {#if poseDebugStatus.lastDiagnostic}<span class="dev-log-detail">{poseDebugStatus.lastDiagnostic}</span>{/if}
+          <button class="btn" on:click={() => void capturePoseDebugNow()}>CAPTURE NOW</button>
+          <button class="btn" on:click={() => void stopPoseDebugLogging('manual')}>STOP + MANIFEST</button>
+        {:else}
+          <button class="btn primary" on:click={() => void startPoseDebugLogging()}>START VISUAL LOG</button>
+          <span class="dev-log-detail">SELECT A LOCAL FOLDER · CAMERA FRAMES NEVER UPLOAD</span>
+        {/if}
+        {#if poseDebugStatus.error}<span class="dev-log-error">{poseDebugStatus.error}</span>{/if}
+        <hr />
+        <strong>STATE SIMULATOR</strong>
         {#if state.stage === 'positioning'}
           <button class="btn" on:click={() => dispatch({ type: 'confirm-ready-position' })}>READY POSITION</button>
         {:else}
@@ -577,7 +647,7 @@
   .modal-backdrop { position:fixed; inset:0; z-index:20; display:grid; place-items:center; padding:24px; overflow-y:auto; background:rgba(255,244,234,.72); backdrop-filter:blur(5px); }.panel { margin:26px auto 0; width:min(660px,100%); border:1px solid var(--line); border-radius:16px; background:rgba(255,250,245,.96); padding:18px; box-shadow:0 18px 60px rgba(120,61,35,.18); }.panel.modal { width:min(620px,calc(100vw - 48px)); max-height:calc(100vh - 48px); margin:0; overflow-y:auto; }.panel h2 { margin:0 0 8px; font-size:18px; }.panel p { margin:7px 0; color:var(--muted); line-height:1.45; font-size:14px; }.btn { border:1px solid var(--coral); border-radius:999px; padding:10px 15px; background:transparent; color:var(--coral-dark); font:700 11px var(--mono); letter-spacing:.02em; }.btn:hover,.btn.primary { background:var(--coral); color:#fff; }.safety { text-align:left; }.safety h2 { font:700 14px var(--mono); letter-spacing:.06em; }.safety strong { color:var(--coral-dark); }.safety-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:14px; }
   .canvas-wrap { position:relative; width:min(760px,100%); margin:38px auto 0; }.canvas-meta { display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:4px; }.canvas-meta span { color:var(--muted); font:700 10px var(--mono); }.canvas-meta span.realtime { color:#267a45; }.state-notice { margin:7px 0 10px; color:var(--coral-dark); font:700 10px/1.3 var(--mono); text-align:center; }
   .canvas { display:grid; grid-template-columns:repeat(var(--art-width),1fr); gap:2px; width:min(720px,100%); margin:0 auto; padding:18px; border:0; background:transparent; }.cell { aspect-ratio:1; min-width:0; border:0; border-radius:1px; background:transparent; padding:0; transition:transform .1s ease,filter .1s; }.cell.target { border:1px solid rgba(255,164,127,.68); background:rgba(255,228,210,.48); }.cell.target:not(:disabled):hover,.cell.target:not(:disabled):focus-visible { transform:scale(1.16); filter:brightness(.96); outline:2px solid var(--coral); outline-offset:1px; }.cell.locked { border-color:var(--coral); background:var(--coral); }.cell.pending,.cell.other { border-color:var(--coral); background:var(--coral); animation:pulse 1.25s ease-in-out infinite; box-shadow:0 0 0 4px rgba(255,90,54,.16); }.cell.other { opacity:.65; animation-delay:-.45s; transform:scale(.72); }.cell.empty { pointer-events:none; }
-  @keyframes pulse { 50% { transform:scale(1.12); box-shadow:0 0 0 10px rgba(255,90,54,0); } }.controls { display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:18px; }.dev-tools { position:absolute; top:50%; right:0; transform:translateY(-50%); display:flex; width:150px; flex-direction:column; gap:8px; padding:12px; border:1px dashed var(--coral); border-radius:12px; background:rgba(255,250,245,.96); box-shadow:0 10px 30px rgba(120,61,35,.12); }.dev-tools strong { color:var(--muted); font:700 10px var(--mono); text-align:center; letter-spacing:.08em; }.dev-tools .btn { padding:8px 9px; font-size:9px; }
+  @keyframes pulse { 50% { transform:scale(1.12); box-shadow:0 0 0 10px rgba(255,90,54,0); } }.controls { display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:18px; }.dev-tools { position:absolute; top:50%; right:-30px; transform:translateY(-50%); display:flex; width:190px; max-height:440px; overflow:auto; flex-direction:column; gap:8px; padding:12px; border:1px dashed var(--coral); border-radius:12px; background:rgba(255,250,245,.97); box-shadow:0 10px 30px rgba(120,61,35,.12); }.dev-tools strong { color:var(--muted); font:700 10px var(--mono); text-align:center; letter-spacing:.08em; }.dev-tools .btn { padding:8px 9px; font-size:9px; }.dev-tools hr { width:100%; margin:2px 0; border:0; border-top:1px dashed var(--line); }.dev-log-status { color:#267a45; font:800 10px/1.2 var(--mono); text-align:center; }.dev-log-detail,.dev-log-error { color:var(--muted); font:700 8px/1.35 var(--mono); text-align:center; }.dev-log-error { color:var(--coral-dark); }
   @media(max-width:900px){.pose-stage{display:block;min-height:0}.camera-setup{grid-template-columns:1fr;width:min(560px,100%)}.dev-tools{position:static;transform:none;width:min(560px,100%);margin:14px auto 0;flex-direction:row;flex-wrap:wrap;justify-content:center}.dev-tools strong{width:100%}}
   @media(max-width:600px){.page{padding:20px 15px 32px}.demo-banner{position:relative;top:0;align-items:flex-start;flex-direction:column}.demo-banner-actions{width:100%;justify-content:flex-end}.status-row{align-items:flex-start}.status-row .mode-selector{gap:5px}.chip{font-size:9px;min-height:32px;padding:8px 9px}.hero{margin-top:44px}.modal-backdrop{padding:15px}.panel{padding:15px}.panel.modal{width:min(620px,calc(100vw - 30px));max-height:calc(100vh - 30px)}.canvas{gap:1px;padding:8px}.grace-cells{gap:8px}.grace-cell{width:24px;height:24px}.privacy-note{font-size:8px}}
   @media(prefers-reduced-motion:reduce){.cell.pending,.cell.other{animation:none;box-shadow:0 0 0 7px rgba(255,90,54,.16)}.body-region-highlight{animation:none}.pose-slot img.celebration-frame{display:none;animation:none}.pose-slot img.celebration-frame:last-child{display:block;opacity:1}}

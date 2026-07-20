@@ -1,0 +1,57 @@
+# Pose estimation visual logging
+
+Pose Visual Log is a development-only camera diagnostic. It records annotated evidence from the same MoveNet inference results and deterministic pose features that drive the challenge timer. It is not rendered in production builds.
+
+## Start a logging session
+
+1. Run `npm run dev` from the repository root.
+2. Open the app in a Chromium-based browser such as Edge or Chrome on `localhost` or HTTPS.
+3. Acknowledge the safety notice, keep **Camera mode** selected, and choose an available pixel.
+4. When camera positioning begins, find **POSE VISUAL LOG** in the developer tools panel.
+5. Select **START VISUAL LOG** and choose a local parent folder. The app creates a timestamped `pose-debug-*` subfolder.
+6. Complete framing and the plank attempt. Use **CAPTURE NOW** for an additional evidence frame when needed.
+7. Select **STOP + MANIFEST**. Completion, release, camera failure, or switching to the guided demo also stops the session automatically.
+
+If the browser does not support directory selection, the logger falls back to individual browser downloads. Browser download protections may require permission for multiple files; Edge or Chrome with a selected directory is the recommended workflow.
+
+## What is captured
+
+Automatic capture occurs:
+
+- On the first analyzed pose frame.
+- Whenever the phase or diagnostic label changes.
+- Every 2.5 seconds while the state remains stable.
+- Up to 90 screenshots per session.
+
+Initial-framing images distinguish `MOVE CLOSER`, `MOVE BACK`, directional positioning, `HOLD STILL`, and `FRAMING READY`. Plank-analysis images distinguish good form, tracking loss, hips high/low, knee extension, neck alignment, shoulder position, and elbow alignment.
+
+Every PNG contains:
+
+- The camera frame in raw camera orientation.
+- MoveNet keypoints and connecting bones.
+- The side selected by the pose engine highlighted in green.
+- Hip, elbow, knee, and neck angles beside their corresponding joints.
+- The current model diagnostic.
+- Framing, confidence, occupancy, normalized hip offset, shoulder stack, model, phase, and pose-rule version.
+
+Every PNG has a JSON file with the same basename. JSON records contain the timestamp, capture reason, keypoints, computed features, framing quality, selected correction, model name, and configuration version. `session-manifest.json` lists the complete session and stop reason.
+
+## Evidence review workflow
+
+Use consented test participants and deliberately capture:
+
+1. Too far away, too close, off-center, stable framing, and tracking loss.
+2. Valid plank form from both facing directions.
+3. Hips too high and too low.
+4. Bent knees, neck misalignment, shoulder displacement, and elbow misalignment.
+5. Correction recovery and timer resumption.
+
+Review whether the skeleton remains aligned with the participant, displayed angles change in the expected direction, diagnostic changes are temporally stable, and the production UI matches the JSON/PNG record. Record device, browser, camera resolution, lighting, clothing, participant consent, expected label, observed label, and reviewer decision outside the captured image.
+
+## Privacy and limitations
+
+- Starting visual logging is always an explicit developer action.
+- Files are written only to a user-selected local folder or browser downloads. The application does not upload debug screenshots or pose records.
+- Captures contain identifiable camera images and body landmarks. Obtain participant consent, restrict access, define a retention period, and never commit them to the repository.
+- Visual logs demonstrate what the model and rule engine observed. They do not establish medical safety, clinical validity, injury prevention, or broad pose accuracy across people and environments.
+- The logger uses raw camera orientation so MoveNet coordinates align directly with saved pixels. The participant preview remains mirrored for usability.

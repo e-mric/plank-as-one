@@ -69,7 +69,7 @@ To run the persistent shared canvas, follow [`supabase/README.md`](./supabase/RE
 5. Hold the plank for the displayed credited duration. Detected corrections stop credited time and receive a five-second grace period before the session pauses; tracking loss pauses after a 500 ms UI debounce.
 6. Complete the challenge to lock the selected pixel for this session, or end the session to release it and retry.
 
-In a development build, **DEV TOOLS** can simulate readiness, valid form, low hips, high hips, tracking loss, and completion. Those controls are intentionally excluded from production builds.
+In a development build, **DEV TOOLS** can simulate readiness, valid form, low hips, high hips, tracking loss, and completion. **POSE VISUAL LOG** can also save consented, annotated camera frames and paired JSON diagnostics to a local folder for camera reliability testing. Those controls are intentionally excluded from production builds. See [`docs/POSE_DEBUG_MODE.md`](./docs/POSE_DEBUG_MODE.md) for the capture workflow and privacy requirements.
 
 For a camera-free product walkthrough, choose **VIEW GUIDED DEMO** from the initial safety notice or camera setup, or open `http://localhost:5173/?demo=1` after starting the app. The persistent `DEMO MODE · SIMULATED POSE DATA` banner distinguishes it from a real completion, and exiting restores the participant's prior local state.
 
@@ -138,6 +138,7 @@ Do not replace the required `/feedback` Session ID with a Git commit, pull reque
 - `apps/web/src/routes/+page.svelte` — participant journey and responsive interface
 - `apps/web/src/lib/state.js` — challenge state machine and local pixel rules
 - `apps/web/src/lib/pose/` — MoveNet detector, frame scheduler, normalized geometry, smoothing, rules, correction arbitration, framing, and audio feedback
+- `apps/web/src/lib/pose/debug-*.js` — development-only annotated pose screenshots, local session export, and capture policy
 - `apps/web/src/lib/artwork.js` — OPENAI BUILD WEEK pixel-art mask
 - `apps/web/src/lib/shared-canvas.js` — anonymous Supabase client, RPC calls, snapshot loading, and realtime reconciliation
 - `apps/web/static/poses/` — ready, correction, celebration, and exhausted character assets
@@ -145,6 +146,7 @@ Do not replace the required `/feedback` Session ID with a Git commit, pull reque
 - `apps/web/test/pose-engine.test.mjs` — deterministic geometry and pose-rule tests
 - `docs/PRD.md` — product requirements, architecture, safety constraints, and roadmap
 - `docs/BUILD_WEEK_REVIEW_CHECKLIST.md` — submission and compliance review checklist
+- `docs/POSE_DEBUG_MODE.md` — consent, capture, output, and visual evidence-review workflow
 - `supabase/migrations/` — RLS-protected persistent canvas schema and atomic lifecycle functions
 - `ASSET_LICENSES.md` — dependency licenses and visual-asset provenance status
 
