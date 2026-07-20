@@ -1,14 +1,16 @@
-# The Plank Canvas — Product Requirements Document
+# Plank As One — Product Requirements Document
 
 | Field | Value |
 | --- | --- |
 | Status | Reviewed MVP definition draft; unresolved release decisions remain |
-| Last updated | 2026-07-17 |
+| Last updated | 2026-07-20 |
 | Target | MVP 1 web application released after its acceptance and safety gates pass |
 | Hackathon | OpenAI Build Week, submission deadline 2026-07-21 at 5:00 p.m. PDT |
 | Submission review | [Build Week compliance and submission checklist](./BUILD_WEEK_REVIEW_CHECKLIST.md) |
 
 > **Reader guide:** The core product context is visible below. Detailed product rules, architecture, design, testing, roadmap, and appendices are grouped into collapsible panels. Resolve the release-critical decisions in section 16 before a public pilot.
+
+> **Build Week implementation note:** **Plank As One** is the product name. The judged prototype's limited-edition shared artwork spells **OPENAI BUILD WEEK**. This PRD includes target public-MVP requirements that are not all present in the Build Week build; the root README is the source of truth for currently demonstrated behavior and limitations.
 
 <details open>
 <summary><strong>Product context (sections 1–3)</strong> — summary, problem, and vision</summary>
@@ -16,7 +18,7 @@
 
 ## 1. Product summary
 
-The Plank Canvas is a web application where people participate in a daily progressive plank challenge on their own schedule. Client-side AI camera tracking provides real-time form correction. Each completed session contributes a “pixel” that gradually reveals a shared, community-wide digital artwork.
+Plank As One is a web application where people participate in a daily progressive plank challenge on their own schedule. Client-side AI camera tracking provides real-time form correction. Each completed session contributes a “pixel” that gradually reveals a shared, community-wide digital artwork.
 
 ## 2. Problem statement
 
@@ -548,7 +550,7 @@ After completion, stop the participant's pulse and lock the reserved coordinate 
 
 The MVP’s principal journey should read as one continuous ritual:
 
-1. **Today’s live canvas:** the participant arrives on a desktop main page dominated by the partially completed `PLANK AS ONE` artwork. Filled squares show permanent contributions, pale outlined squares show available targets, and small anonymous pulses show current reservations. The page also shows the Camera/Honor selector, streak, target, local reset countdown, archive/menu access, anonymous canvas activity, and `SELECT YOUR PIXEL`. It shows `READY ?` with an empty five-cell indicator rather than claiming valid form before the attempt.
+1. **Today’s live canvas:** the participant arrives on a desktop main page dominated by the partially completed `OPENAI BUILD WEEK` artwork for the Build Week edition. Filled squares show permanent contributions, pale outlined squares show available targets, and small anonymous pulses show current reservations. The page also shows the Camera/Honor selector, streak, target, local reset countdown, archive/menu access, anonymous canvas activity, and `SELECT YOUR PIXEL`. It shows `READY ?` with an empty five-cell indicator rather than claiming valid form before the attempt. Later challenge editions may reveal different artwork while retaining the Plank As One product identity.
 2. **Route, safety, and readiness:** the participant chooses camera validation or honor mode and acknowledges the safety notice. Camera participants grant permission and complete framing guidance before the canvas becomes selectable; honor participants receive the keep-this-page-open warning. Guided demo remains isolated.
 3. **Reserve and countdown:** selecting an available cell atomically reserves it and immediately triggers the clear `3`, `2`, `1` countdown. The selected cell becomes a larger labelled `YOUR PIXEL · PENDING` pulse. A collision refreshes the cell and returns focus to canvas selection.
 4. **Active shared plank:** the unified main page keeps live-presence and daily counts at the top, then shows `00:00 / 00:30`, the validated pose visualization, grace state, and on-device notice above the centered shared canvas. The streak remains visible at the lower edge. Anonymous pending pixels continue pulsing on the canvas.
@@ -570,7 +572,7 @@ The introduction explains the product emotionally before it explains it function
 3. **Try again:** inspired by the group, the protagonist plants their elbows, resets their posture, and begins a new plank with visibly calmer form.
 4. **Effort becomes company:** square pixels fall from above, gather around them, and assemble into other people holding planks. Each figure should form from the same cell language used by the shared artwork.
 5. **Benefits appear:** as the camera pulls upward, short evidence-reviewed captions appear between the growing groups. Captions remain secondary to the story and never interrupt scrolling.
-6. **The collective image:** the camera continues to zoom out until the protagonist and the surrounding participants resolve into the pixel letterforms `PLANK AS ONE`.
+6. **The collective image:** the camera continues to zoom out until the protagonist and the surrounding participants resolve into the current challenge artwork. For the Build Week edition, the pixel letterforms read `OPENAI BUILD WEEK`; the Plank As One product name remains visible in the surrounding interface.
 7. **Invitation:** one final empty cell pulses in the artwork. The copy reads `ONE PLANK. ONE PIXEL. ONE CANVAS.` and transitions to today's main page with `SELECT A PIXEL TO BEGIN` after the participant completes the required route, safety, and readiness steps.
 
 The sequence must remain understandable without sound and uses no voice-over. If audio is implemented, use original ambient/chiptune music with simple sound effects, muted by default, and provide a persistent sound toggle. Audio remains optional and cannot block or delay the core introduction.

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createInitialState, chooseMode, acknowledgeSafety, selectCell, confirmReadyPosition, tick, setForm, endSession, reduce, ARTWORK_WIDTH, ARTWORK_HEIGHT } from '../state.js';
+import { applySharedCanvasSnapshot, createGuidedDemoState, createInitialState, chooseMode, acknowledgeSafety, selectCell, confirmReadyPosition, tick, setForm, endSession, reduce, ARTWORK_WIDTH, ARTWORK_HEIGHT } from '../state.js';
 
 const availableCell = (state, offset = 0) => state.cells.filter((cell) => cell.status === 'available')[offset].id;
 
@@ -153,4 +153,39 @@ test('pose updates preserve the selected correction through the grace pause', ()
   s = reduce(s, { type: 'pose-update', form: 'valid' });
   assert.equal(s.stage, 'active');
   assert.equal(s.correction, null);
+});
+
+test('guided demo uses isolated state and never changes real progress counters', () => {
+  const real = acknowledgeSafety(createInitialState({ target: 30, todayCount: 128, streak: 7 }));
+  const snapshot = structuredClone(real);
+  let demo = createGuidedDemoState(real, { target: 1 });
+  assert.equal(demo.demo, true);
+  assert.equal(demo.stage, 'positioning');
+  assert.equal(demo.cells[demo.selectedCell].status, 'pending');
+  demo = confirmReadyPosition(demo);
+  demo = tick(demo, 3000);
+  demo = tick(demo, 1000);
+  assert.equal(demo.stage, 'complete');
+  assert.equal(demo.completionMethod, 'guided-demo');
+  assert.equal(demo.todayCount, 128);
+  assert.equal(demo.streak, 7);
+  assert.equal(demo.target, 1);
+  assert.deepEqual(real, snapshot);
+});
+
+test('shared snapshots reconcile locked, peer-pending, and owned-pending pixels', () => {
+  const source = createInitialState({ stage: 'active', selectedCell: 22 });
+  const next = applySharedCanvasSnapshot(source, [
+    { cell_id: 1, status: 'locked' },
+    { cell_id: 22, status: 'pending' },
+    { cell_id: 25, status: 'pending' },
+  ]);
+
+  assert.equal(next.shared, true);
+  assert.equal(next.todayCount, 1);
+  assert.equal(next.liveCount, 2);
+  assert.equal(next.cells.find((cell) => cell.id === 1).status, 'locked');
+  assert.equal(next.cells.find((cell) => cell.id === 22).status, 'pending');
+  assert.equal(next.cells.find((cell) => cell.id === 25).status, 'other');
+  assert.equal(next.cells.find((cell) => cell.id === 2).status, 'available');
 });

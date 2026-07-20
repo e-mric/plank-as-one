@@ -1,6 +1,6 @@
 # OpenAI Build Week — Compliance and Submission Review
 
-**Project:** The Plank Canvas
+**Project:** Plank As One
 
 **Proposed track:** Apps for Your Life
 
@@ -128,7 +128,7 @@ Official Rules section 4, Submission Requirements and Testing, applies.
 
 ### Required README content
 
-- [ ] `P0` What The Plank Canvas does and which real audience/problem it serves.
+- [ ] `P0` What Plank As One does and which real audience/problem it serves.
 - [ ] `P0` How to run and test the application.
 - [ ] `P0` Supported platform/browser requirements and known limitations.
 - [ ] `P0` Architecture and privacy explanation, especially browser-only camera processing.

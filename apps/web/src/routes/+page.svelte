@@ -1,7 +1,9 @@
 <script lang="ts">
   import { onMount, tick as svelteTick } from 'svelte';
   import { dev } from '$app/environment';
-  import { createInitialState, reduce, GRID_WIDTH } from '$lib/state.js';
+  import { env } from '$env/dynamic/public';
+  import { applySharedCanvasSnapshot, createGuidedDemoState, createInitialState, reduce, GRID_WIDTH } from '$lib/state.js';
+  import { createSharedCanvasService, getSharedCanvasConfig } from '$lib/shared-canvas.js';
   import { createMoveNetDetector } from '$lib/pose/detector.js';
   import { startPoseInference } from '$lib/pose/frame-scheduler.js';
   import { CAMERA_CONSTRAINTS, describeFraming, getCameraErrorMessage } from '$lib/pose/setup-machine.js';
@@ -33,6 +35,16 @@
   let audioMuted = false;
   const audio = createAudioFeedback();
   let lastAudioCorrection = '';
+  let guidedDemo = false;
+  let demoReturnState: any = null;
+  let demoRunId = 0;
+  let demoStep = '';
+  let sharedService: any = null;
+  let sharedReady = false;
+  let sharedActionPending = false;
+  let sharedOwnedCellId: number | null = null;
+  let sharedStatus = 'local';
+  let heartbeatInterval: ReturnType<typeof setInterval>;
 
   $: active = ['positioning', 'countdown', 'active', 'grace', 'paused'].includes(state.stage);
   $: locked = state.stage !== 'ready';
@@ -40,7 +52,7 @@
   $: trackingVisible = state.form === 'tracking' && (state.trackingMs >= 500 || state.stage === 'paused');
   $: showFormFeedback = state.mode === 'camera' && ['ready', 'positioning', 'countdown', 'active', 'grace', 'paused', 'complete'].includes(state.stage);
   $: formFeedbackLabel = state.lastOutcome === 'complete'
-    ? 'POWER UP +2'
+    ? state.demo ? 'DEMO COMPLETE' : 'POWER UP +2'
     : state.lastOutcome === 'failed'
       ? 'TOO BAD!'
       : state.stage === 'positioning'
@@ -79,21 +91,31 @@
       ? { kind: 'bad', src: '/poses/pose-bad.png', alt: 'Pixel-art person holding a bad plank form' }
       : { kind: 'ready', src: '/poses/pose-ready.png', alt: 'Pixel-art person in the ready position' };
 
-  $: showCameraSetup = state.mode === 'camera' && state.stage === 'positioning';
+  $: showCameraSetup = !guidedDemo && state.mode === 'camera' && state.stage === 'positioning';
+  $: sharedStatusLabel = sharedStatus === 'live'
+    ? 'SHARED CANVAS LIVE'
+    : sharedStatus === 'connecting'
+      ? 'SHARED CANVAS CONNECTING'
+      : sharedStatus === 'error' || sharedStatus === 'offline'
+        ? sharedReady ? 'SHARED CANVAS DEGRADED' : 'SHARED OFFLINE · LOCAL FALLBACK'
+        : 'LOCAL MOCK DATA';
 
   function dispatch(action: Action) {
     const previous = state;
     state = reduce(state, action);
-    if (previous.stage !== state.stage && state.stage === 'positioning') void startCamera();
+    if (!guidedDemo && previous.stage !== state.stage && state.stage === 'positioning') void startCamera();
     if (previous.mode === 'camera' && activeStage(previous.stage) && !activeStage(state.stage)) stopCamera();
     if (state.stage === 'complete' && previous.stage !== 'complete') {
       stopCamera();
-      void audio.initialize().then(() => audio.complete());
+      void initializeAudio().then(() => audio.complete());
+      if (!guidedDemo && sharedReady && sharedService && state.selectedCell !== null) {
+        void commitSharedPixel(state.selectedCell, state.completionMethod);
+      }
     }
     const nextCorrectionKind = state.correction?.kind || '';
     if (nextCorrectionKind && nextCorrectionKind !== lastAudioCorrection) {
       lastAudioCorrection = nextCorrectionKind;
-      void audio.initialize().then(() => audio.correction(state.correction));
+      void initializeAudio().then(() => audio.correction(state.correction));
     }
     if (!state.correction) lastAudioCorrection = '';
   }
@@ -102,8 +124,94 @@
     return ['positioning', 'countdown', 'active', 'grace', 'paused'].includes(stage);
   }
 
+  function describeSharedFailure(reason = '') {
+    const labels: Record<string, string> = {
+      'already-completed': 'TODAY\'S SHARED PIXEL IS ALREADY COMPLETE',
+      'active-reservation': 'YOU ALREADY HAVE AN ACTIVE PIXEL',
+      'cell-unavailable': 'THAT PIXEL WAS JUST TAKEN · CHOOSE ANOTHER',
+      'reservation-conflict': 'RESERVATION COLLISION · CHOOSE ANOTHER',
+      'reservation-lost': 'SHARED RESERVATION EXPIRED · TRY AGAIN',
+      'completion-conflict': 'SHARED COMPLETION COULD NOT BE COMMITTED',
+    };
+    return labels[reason] || 'SHARED CANVAS UNAVAILABLE · USING LOCAL STATE';
+  }
+
+  function handleSharedSnapshot(rows: any[]) {
+    sharedReady = true;
+    const ownedCellId = sharedOwnedCellId ?? state.selectedCell;
+    if (guidedDemo && demoReturnState) {
+      demoReturnState = applySharedCanvasSnapshot(demoReturnState, rows, { ownedCellId });
+      return;
+    }
+    let next = applySharedCanvasSnapshot(state, rows, { ownedCellId });
+    if (!sharedActionPending && activeStage(state.stage) && state.selectedCell !== null) {
+      const remoteStatus = rows.find((row) => row.cell_id === state.selectedCell)?.status;
+      if (remoteStatus !== 'pending' && remoteStatus !== 'locked') {
+        next = reduce(next, { type: 'end-session' });
+        next = { ...next, notice: 'SHARED RESERVATION EXPIRED · PICK A NEW PIXEL' };
+        sharedOwnedCellId = null;
+        stopCamera();
+      }
+    }
+    state = next;
+  }
+
+  async function selectSharedCell(cellId: number) {
+    if (sharedActionPending || state.stage !== 'ready') return;
+    if (!sharedReady || !sharedService) {
+      dispatch({ type: 'select-cell', cellId });
+      return;
+    }
+    sharedActionPending = true;
+    sharedOwnedCellId = cellId;
+    try {
+      const result = await sharedService.reserve(cellId);
+      if (!result.ok) {
+        sharedOwnedCellId = null;
+        state = { ...state, notice: describeSharedFailure(result.reason) };
+        await sharedService.refresh();
+        return;
+      }
+      state = {
+        ...state,
+        cells: state.cells.map((cell: Pixel) => cell.id === cellId ? { ...cell, status: 'available' } : cell),
+      };
+      dispatch({ type: 'select-cell', cellId });
+      await sharedService.refresh();
+    } catch {
+      sharedOwnedCellId = null;
+      sharedStatus = 'error';
+      state = { ...state, notice: describeSharedFailure() };
+    } finally {
+      sharedActionPending = false;
+    }
+  }
+
+  async function endSharedSession() {
+    const cellId = state.selectedCell;
+    dispatch({ type: 'end-session' });
+    sharedOwnedCellId = null;
+    if (!sharedReady || !sharedService || cellId === null) return;
+    try {
+      await sharedService.release(cellId);
+    } catch {
+      sharedStatus = 'error';
+    }
+  }
+
+  async function commitSharedPixel(cellId: number, completionMethod: string) {
+    try {
+      const result = await sharedService.commit(cellId, completionMethod);
+      if (!result.ok) state = { ...state, notice: describeSharedFailure(result.reason) };
+      else sharedOwnedCellId = null;
+    } catch {
+      sharedStatus = 'error';
+      state = { ...state, notice: 'WORKOUT COMPLETE · SHARED PIXEL COMMIT NEEDS RETRY' };
+    }
+  }
+
   async function startCamera() {
-    if (cameraStarting || cameraStream || state.mode !== 'camera' || state.stage !== 'positioning') return;
+    if (guidedDemo || cameraStarting || cameraStream || state.mode !== 'camera' || state.stage !== 'positioning') return;
     const requestId = ++cameraRequestId;
     cameraStarting = true;
     cameraStatus = 'requesting';
@@ -175,7 +283,11 @@
   }
 
   async function initializeAudio() {
-    await audio.initialize();
+    try {
+      return await audio.initialize();
+    } catch {
+      return false;
+    }
   }
 
   function toggleMute() {
@@ -184,7 +296,7 @@
   }
 
   function playTestSound() {
-    void audio.initialize().then(() => audio.test());
+    void initializeAudio().then(() => audio.test());
   }
   function chooseMode(mode: string) { dispatch({ type: 'choose-mode', mode }); }
   function skipToCelebration() {
@@ -201,15 +313,101 @@
     state = { ...state, stage: 'ready', requestedCell: null, selectedCell: null, notice: '' };
   }
 
+  function waitForDemo(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async function playGuidedDemo(runId: number) {
+    demoStep = 'SIMULATING CAMERA READINESS';
+    await waitForDemo(900);
+    if (!guidedDemo || runId !== demoRunId) return;
+    demoStep = 'READY POSITION DETECTED';
+    dispatch({ type: 'confirm-ready-position' });
+
+    await waitForDemo(3250);
+    if (!guidedDemo || runId !== demoRunId) return;
+    demoStep = 'VALID FORM · TIME COUNTING';
+    dispatch({ type: 'set-form', form: 'valid' });
+
+    await waitForDemo(1000);
+    if (!guidedDemo || runId !== demoRunId) return;
+    demoStep = 'SIMULATING HIPS TOO LOW';
+    dispatch({ type: 'set-form', form: 'hips-low', correction: { kind: 'hips-low', label: 'HIPS UP', voice: 'Hips up.' } });
+
+    await waitForDemo(5250);
+    if (!guidedDemo || runId !== demoRunId) return;
+    demoStep = 'FORM PAUSED · SIMULATING RECOVERY';
+
+    await waitForDemo(900);
+    if (!guidedDemo || runId !== demoRunId) return;
+    demoStep = 'VALID FORM RESTORED';
+    dispatch({ type: 'set-form', form: 'valid' });
+
+    await waitForDemo(900);
+    if (!guidedDemo || runId !== demoRunId) return;
+    demoStep = 'COMPLETING ISOLATED DEMO';
+    dispatch({ type: 'tick', ms: Math.max(1, state.target * 1000 - state.creditedMs) });
+    demoStep = 'DEMO COMPLETE · REAL PROGRESS UNCHANGED';
+  }
+
+  function launchGuidedDemo(withAudio: boolean) {
+    const source = guidedDemo && demoReturnState ? demoReturnState : state;
+    if (!guidedDemo) demoReturnState = state;
+    stopCamera();
+    if (withAudio) void initializeAudio();
+    guidedDemo = true;
+    const runId = ++demoRunId;
+    state = createGuidedDemoState(source);
+    if (state.stage !== 'positioning') {
+      demoStep = 'DEMO UNAVAILABLE · NO OPEN PIXEL';
+      return;
+    }
+    void playGuidedDemo(runId);
+  }
+
+  function startGuidedDemo() {
+    launchGuidedDemo(true);
+  }
+
+  function exitGuidedDemo() {
+    demoRunId += 1;
+    stopCamera();
+    if (demoReturnState) state = demoReturnState;
+    const restartCamera = state.mode === 'camera' && state.stage === 'positioning';
+    demoReturnState = null;
+    guidedDemo = false;
+    demoStep = '';
+    if (restartCamera) void startCamera();
+  }
+
   onMount(() => {
+    const sharedConfig = getSharedCanvasConfig(env);
+    if (sharedConfig) {
+      sharedService = createSharedCanvasService(sharedConfig);
+      void sharedService.connect({
+        onSnapshot: handleSharedSnapshot,
+        onStatus: (status: string) => { sharedStatus = status; },
+      }).catch(() => {
+        sharedReady = false;
+        sharedStatus = 'error';
+      });
+    }
     interval = setInterval(() => {
       if (['countdown', 'active', 'grace'].includes(state.stage)) dispatch({ type: 'tick', ms: 250 });
     }, 250);
+    heartbeatInterval = setInterval(() => {
+      if (!guidedDemo && sharedReady && sharedService && activeStage(state.stage) && state.selectedCell !== null) {
+        void sharedService.renew(state.selectedCell).then((result: any) => {
+          if (!result.ok) void sharedService.refresh();
+        }).catch(() => { sharedStatus = 'error'; });
+      }
+    }, 10000);
     const abandonHonor = () => {
-      if (document.visibilityState === 'hidden' && state.mode === 'honor' && active) dispatch({ type: 'end-session' });
+      if (document.visibilityState === 'hidden' && state.mode === 'honor' && active) void endSharedSession();
     };
     document.addEventListener('visibilitychange', abandonHonor);
-    return () => { clearInterval(interval); document.removeEventListener('visibilitychange', abandonHonor); stopCamera(); audio.dispose(); };
+    if (new URL(window.location.href).searchParams.get('demo') === '1') launchGuidedDemo(false);
+    return () => { demoRunId += 1; clearInterval(interval); clearInterval(heartbeatInterval); document.removeEventListener('visibilitychange', abandonHonor); stopCamera(); audio.dispose(); void sharedService?.disconnect(); };
   });
 </script>
 
@@ -219,6 +417,15 @@
 </svelte:head>
 
 <main class="page" aria-label="Plank As One active main page">
+  {#if guidedDemo}
+    <aside class="demo-banner" aria-live="polite">
+      <div><strong>DEMO MODE · SIMULATED POSE DATA</strong><span>{demoStep}</span></div>
+      <div class="demo-banner-actions">
+        {#if state.stage === 'complete'}<button class="btn" on:click={startGuidedDemo}>REPLAY</button>{/if}
+        <button class="btn" on:click={exitGuidedDemo}>EXIT DEMO</button>
+      </div>
+    </aside>
+  {/if}
   <header class="status-row">
     <div class="mode-selector" role="group" aria-label="Challenge mode">
       <button
@@ -256,6 +463,7 @@
           <strong>{cameraMessage}</strong>
           <span>ONE PERSON · SIDE VIEW · FULL BODY VISIBLE</span>
           {#if cameraStatus === 'error'}<button class="btn" on:click={() => void startCamera()}>TRY CAMERA AGAIN</button>{/if}
+          <button class="btn" on:click={startGuidedDemo}>VIEW GUIDED DEMO</button>
           <div class="audio-check">
             <span>AUDIO FEEDBACK {audioMuted ? 'MUTED' : 'ON'}</span>
             <button class="btn" on:click={playTestSound}>PLAY TEST SOUND</button>
@@ -287,7 +495,7 @@
         </div>
       {/if}
     </section>
-    {#if dev && active && state.mode === 'camera' && state.stage !== 'countdown'}
+    {#if dev && !guidedDemo && active && state.mode === 'camera' && state.stage !== 'countdown'}
       <aside class="dev-tools" aria-label="Developer form testing controls">
         <strong>DEV TOOLS</strong>
         {#if state.stage === 'positioning'}
@@ -327,6 +535,7 @@
         <p><strong>Stop immediately</strong> if you experience concerning pain, chest pain or pressure, dizziness or faintness, unusual shortness of breath, or a pounding or irregular heartbeat.</p>
         <p>If you have a health condition, injury, or concerns about starting or increasing exercise, seek guidance from a qualified health professional.</p>
         <div class="safety-actions">
+          <button class="btn" on:click={startGuidedDemo}>VIEW GUIDED DEMO</button>
           <button class="btn" on:click={cancelSafety}>GO BACK</button>
           <button class="btn primary" on:click={() => { void initializeAudio(); dispatch({ type: 'acknowledge-safety' }); }}>I UNDERSTAND</button>
         </div>
@@ -335,11 +544,12 @@
   {/if}
 
   <section class="canvas-wrap" aria-label="Shared canvas">
-    <div class="canvas-meta"><span>{state.cells.filter((c: Pixel) => c.status === 'locked').length} PIXELS LIVE · {state.liveCount} ACTIVE</span></div>
+    <div class="canvas-meta"><span class:realtime={sharedStatus === 'live'}>{sharedStatusLabel}</span><span>{state.cells.filter((c: Pixel) => c.status === 'locked').length} PIXELS LIVE · {state.liveCount} ACTIVE</span></div>
+    {#if state.notice}<div class="state-notice" aria-live="polite">{state.notice}</div>{/if}
 
     <div class="canvas" style={`--art-width:${GRID_WIDTH}`} role="grid" aria-label="OPENAI BUILD WEEK shared pixel artwork. Select an outlined target pixel.">
       {#each state.cells as cell (cell.id)}
-        <button class:target={cell.target} class:empty={!cell.target} class:locked={cell.status === 'locked'} class:pending={cell.status === 'pending'} class:other={cell.status === 'other'} class="cell" disabled={cell.status !== 'available' || locked} on:click={() => dispatch({ type: 'select-cell', cellId: cell.id })} aria-label={cell.target ? `Artwork pixel ${cell.id + 1}, ${cell.status}` : 'Artwork background'} aria-pressed={cell.status === 'pending'}></button>
+        <button class:target={cell.target} class:empty={!cell.target} class:locked={cell.status === 'locked'} class:pending={cell.status === 'pending'} class:other={cell.status === 'other'} class="cell" disabled={cell.status !== 'available' || locked || sharedActionPending} on:click={() => void selectSharedCell(cell.id)} aria-label={cell.target ? `Artwork pixel ${cell.id + 1}, ${cell.status}` : 'Artwork background'} aria-pressed={cell.status === 'pending'}></button>
       {/each}
     </div>
     {#if state.stage === 'ready'}
@@ -348,13 +558,16 @@
   </section>
 
   <div class="controls">
-    {#if active}<button class="btn" on:click={() => dispatch({ type: 'end-session' })}>END SESSION · RELEASE PIXEL</button>{:else if state.stage === 'complete'}<span class="chip">YOUR PIXEL IS LIVE 🔥</span>{/if}
+    {#if guidedDemo}
+      <span class="chip">ISOLATED DEMO · NO PROGRESS SAVED</span>
+    {:else if active}<button class="btn" on:click={() => void endSharedSession()}>END SESSION · RELEASE PIXEL</button>{:else if state.stage === 'complete'}<span class="chip">YOUR PIXEL IS LIVE 🔥</span>{/if}
   </div>
 
 </main>
 
 <style>
   .page { width:min(980px,100%); min-height:100vh; margin:auto; padding:32px 28px 44px; }
+  .demo-banner { position:sticky; z-index:15; top:12px; display:flex; align-items:center; justify-content:space-between; gap:14px; width:min(820px,100%); margin:0 auto 18px; padding:12px 14px; border:2px solid var(--coral); border-radius:13px; background:rgba(255,250,245,.97); box-shadow:0 12px 36px rgba(120,61,35,.16); color:var(--coral-dark); font-family:var(--mono); }.demo-banner > div:first-child { display:flex; flex-direction:column; gap:4px; }.demo-banner strong { font-size:12px; letter-spacing:.04em; }.demo-banner span { color:var(--muted); font-size:10px; }.demo-banner-actions { display:flex; flex-shrink:0; gap:8px; }.demo-banner .btn { padding:8px 11px; font-size:9px; }
   .status-row { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }.status-group { display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
   .chip { display:inline-flex; align-items:center; min-height:38px; padding:9px 13px; border:1px solid var(--line); border-radius:999px; background:rgba(255,250,245,.88); color:var(--muted); font:700 11px/1 var(--mono); letter-spacing:.02em; }
   .hero { width:min(650px,100%); margin:58px auto 0; text-align:center; }.brand-title { margin:0 0 10px; color:var(--coral); font:700 clamp(30px,6vw,52px)/.95 var(--mono); letter-spacing:.04em; }.mode-selector { display:flex; justify-content:center; gap:10px; }.mode-chip { min-height:34px; background:transparent; cursor:pointer; }.mode-chip.selected { border-color:var(--coral); color:var(--coral-dark); box-shadow:0 0 0 2px rgba(255,90,54,.12); }.mode-chip:disabled { cursor:not-allowed; opacity:.6; }.mode-chip.selected:disabled { opacity:1; }.timer { margin:0; font:700 clamp(52px,11vw,108px)/.9 var(--mono); letter-spacing:-.08em; }.timer small { font-size:.22em; letter-spacing:0; margin-left:8px; color:var(--muted); }.validation { display:inline-flex; align-items:center; gap:8px; margin-top:16px; padding:9px 13px; border:1px solid var(--line); border-radius:999px; color:var(--muted); background:rgba(255,250,245,.85); font:700 10px var(--mono); }.selection-chip { display:flex; width:max-content; margin:16px auto 0; background:transparent; }
@@ -362,11 +575,11 @@
   .camera-setup { display:grid; grid-template-columns:minmax(240px,360px) minmax(220px,1fr); gap:18px; align-items:center; width:min(760px,100%); margin:0 auto 18px; padding:14px; border:1px solid var(--line); border-radius:14px; background:rgba(255,250,245,.82); }.camera-preview-wrap { position:relative; overflow:hidden; aspect-ratio:16/9; border:1px solid var(--line); border-radius:9px; background:#2d2421; }.camera-preview { display:block; width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }.framing-guide { position:absolute; inset:14% 7%; display:grid; place-items:center; border:2px dashed rgba(255,250,245,.82); border-radius:42%; pointer-events:none; }.framing-guide span { width:45%; height:2px; background:rgba(255,250,245,.6); }.camera-loading { position:absolute; inset:0; display:grid; place-items:center; padding:10px; background:rgba(36,25,22,.62); color:#fffaf5; text-align:center; font:700 12px var(--mono); }.camera-copy { display:flex; flex-direction:column; gap:8px; color:var(--muted); font:700 11px/1.35 var(--mono); }.camera-copy strong { color:var(--coral-dark); font-size:16px; }.audio-check { display:flex; flex-wrap:wrap; align-items:center; gap:7px; margin-top:5px; }.audio-check span { width:100%; color:var(--ink); }.audio-check .btn,.camera-copy > .btn { padding:8px 10px; font-size:9px; }
   .pose-visual { position:relative; width:100%; height:180px; }.pose-visual > img { height:100%; max-height:none; }.body-region-highlight { position:absolute; z-index:2; top:54%; left:48%; width:52px; height:52px; transform:translate(-50%,-50%); border:3px solid var(--coral); border-radius:50%; background:rgba(255,90,54,.24); box-shadow:0 0 0 8px rgba(255,90,54,.12); animation:region-pulse .8s steps(2,end) infinite; pointer-events:none; }.correction-arrow-slot { display:flex; align-items:center; justify-content:center; height:54px; }.pixel-correction-arrow { position:relative; display:block; width:48px; height:36px; transform:rotate(-90deg); transform-origin:center; filter:drop-shadow(2px 2px 0 rgba(255,90,54,.22)); image-rendering:pixelated; }.pixel-correction-arrow::before,.pixel-correction-arrow::after { content:""; position:absolute; display:block; }.pixel-correction-arrow::before { inset:0; background:var(--coral-dark); clip-path:polygon(0 22%,50% 22%,50% 0,67% 0,67% 11%,75% 11%,75% 22%,83% 22%,83% 33%,92% 33%,92% 44%,100% 44%,100% 56%,92% 56%,92% 67%,83% 67%,83% 78%,75% 78%,75% 89%,67% 89%,67% 100%,50% 100%,50% 78%,0 78%); }.pixel-correction-arrow::after { inset:4px; background:linear-gradient(180deg,var(--peach) 0 34%,#ff9c68 34% 64%,var(--coral) 64% 82%,var(--coral-dark) 82% 100%); clip-path:polygon(0 21%,50% 21%,50% 0,65% 0,65% 11%,73% 11%,73% 21%,81% 21%,81% 32%,89% 32%,89% 43%,100% 43%,100% 57%,89% 57%,89% 68%,81% 68%,81% 79%,73% 79%,73% 89%,65% 89%,65% 100%,50% 100%,50% 79%,0 79%); }.pixel-correction-arrow.down { transform:rotate(90deg); }
   .modal-backdrop { position:fixed; inset:0; z-index:20; display:grid; place-items:center; padding:24px; overflow-y:auto; background:rgba(255,244,234,.72); backdrop-filter:blur(5px); }.panel { margin:26px auto 0; width:min(660px,100%); border:1px solid var(--line); border-radius:16px; background:rgba(255,250,245,.96); padding:18px; box-shadow:0 18px 60px rgba(120,61,35,.18); }.panel.modal { width:min(620px,calc(100vw - 48px)); max-height:calc(100vh - 48px); margin:0; overflow-y:auto; }.panel h2 { margin:0 0 8px; font-size:18px; }.panel p { margin:7px 0; color:var(--muted); line-height:1.45; font-size:14px; }.btn { border:1px solid var(--coral); border-radius:999px; padding:10px 15px; background:transparent; color:var(--coral-dark); font:700 11px var(--mono); letter-spacing:.02em; }.btn:hover,.btn.primary { background:var(--coral); color:#fff; }.safety { text-align:left; }.safety h2 { font:700 14px var(--mono); letter-spacing:.06em; }.safety strong { color:var(--coral-dark); }.safety-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:14px; }
-  .canvas-wrap { position:relative; width:min(760px,100%); margin:38px auto 0; }.canvas-meta { display:flex; justify-content:flex-end; align-items:baseline; margin-bottom:4px; }.canvas-meta span { color:var(--muted); font:700 10px var(--mono); }
+  .canvas-wrap { position:relative; width:min(760px,100%); margin:38px auto 0; }.canvas-meta { display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:4px; }.canvas-meta span { color:var(--muted); font:700 10px var(--mono); }.canvas-meta span.realtime { color:#267a45; }.state-notice { margin:7px 0 10px; color:var(--coral-dark); font:700 10px/1.3 var(--mono); text-align:center; }
   .canvas { display:grid; grid-template-columns:repeat(var(--art-width),1fr); gap:2px; width:min(720px,100%); margin:0 auto; padding:18px; border:0; background:transparent; }.cell { aspect-ratio:1; min-width:0; border:0; border-radius:1px; background:transparent; padding:0; transition:transform .1s ease,filter .1s; }.cell.target { border:1px solid rgba(255,164,127,.68); background:rgba(255,228,210,.48); }.cell.target:not(:disabled):hover,.cell.target:not(:disabled):focus-visible { transform:scale(1.16); filter:brightness(.96); outline:2px solid var(--coral); outline-offset:1px; }.cell.locked { border-color:var(--coral); background:var(--coral); }.cell.pending,.cell.other { border-color:var(--coral); background:var(--coral); animation:pulse 1.25s ease-in-out infinite; box-shadow:0 0 0 4px rgba(255,90,54,.16); }.cell.other { opacity:.65; animation-delay:-.45s; transform:scale(.72); }.cell.empty { pointer-events:none; }
   @keyframes pulse { 50% { transform:scale(1.12); box-shadow:0 0 0 10px rgba(255,90,54,0); } }.controls { display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:18px; }.dev-tools { position:absolute; top:50%; right:0; transform:translateY(-50%); display:flex; width:150px; flex-direction:column; gap:8px; padding:12px; border:1px dashed var(--coral); border-radius:12px; background:rgba(255,250,245,.96); box-shadow:0 10px 30px rgba(120,61,35,.12); }.dev-tools strong { color:var(--muted); font:700 10px var(--mono); text-align:center; letter-spacing:.08em; }.dev-tools .btn { padding:8px 9px; font-size:9px; }
   @media(max-width:900px){.pose-stage{display:block;min-height:0}.camera-setup{grid-template-columns:1fr;width:min(560px,100%)}.dev-tools{position:static;transform:none;width:min(560px,100%);margin:14px auto 0;flex-direction:row;flex-wrap:wrap;justify-content:center}.dev-tools strong{width:100%}}
-  @media(max-width:600px){.page{padding:20px 15px 32px}.status-row{align-items:flex-start}.status-row .mode-selector{gap:5px}.chip{font-size:9px;min-height:32px;padding:8px 9px}.hero{margin-top:44px}.modal-backdrop{padding:15px}.panel{padding:15px}.panel.modal{width:min(620px,calc(100vw - 30px));max-height:calc(100vh - 30px)}.canvas{gap:1px;padding:8px}.grace-cells{gap:8px}.grace-cell{width:24px;height:24px}.privacy-note{font-size:8px}}
+  @media(max-width:600px){.page{padding:20px 15px 32px}.demo-banner{position:relative;top:0;align-items:flex-start;flex-direction:column}.demo-banner-actions{width:100%;justify-content:flex-end}.status-row{align-items:flex-start}.status-row .mode-selector{gap:5px}.chip{font-size:9px;min-height:32px;padding:8px 9px}.hero{margin-top:44px}.modal-backdrop{padding:15px}.panel{padding:15px}.panel.modal{width:min(620px,calc(100vw - 30px));max-height:calc(100vh - 30px)}.canvas{gap:1px;padding:8px}.grace-cells{gap:8px}.grace-cell{width:24px;height:24px}.privacy-note{font-size:8px}}
   @media(prefers-reduced-motion:reduce){.cell.pending,.cell.other{animation:none;box-shadow:0 0 0 7px rgba(255,90,54,.16)}.body-region-highlight{animation:none}.pose-slot img.celebration-frame{display:none;animation:none}.pose-slot img.celebration-frame:last-child{display:block;opacity:1}}
   .pixel-correction-arrow.sideways { transform:rotate(0deg); }.pixel-correction-arrow.sideways.back { transform:rotate(180deg); }
   @keyframes region-pulse { 50% { transform:translate(-50%,-50%) scale(1.18); box-shadow:0 0 0 14px rgba(255,90,54,0); } }

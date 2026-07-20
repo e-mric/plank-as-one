@@ -41,8 +41,63 @@ export function createInitialState(overrides = {}) {
     completionMethod: null,
     lastOutcome: null,
     notice: '',
+    demo: false,
+    shared: false,
     ...overrides,
   };
+}
+
+export function applySharedCanvasSnapshot(state, rows, { ownedCellId = state.selectedCell } = {}) {
+  const remote = new Map(
+    (Array.isArray(rows) ? rows : [])
+      .filter((row) => Number.isInteger(row?.cell_id) && ['available', 'pending', 'locked'].includes(row?.status))
+      .map((row) => [row.cell_id, row.status]),
+  );
+  const cells = state.cells.map((cell) => {
+    if (!cell.target) return { ...cell, status: 'empty' };
+    const status = remote.get(cell.id) || 'available';
+    if (status === 'pending') return { ...cell, status: cell.id === ownedCellId ? 'pending' : 'other' };
+    return { ...cell, status };
+  });
+  const statuses = [...remote.values()];
+  return {
+    ...state,
+    cells,
+    liveCount: statuses.filter((status) => status === 'pending').length,
+    todayCount: statuses.filter((status) => status === 'locked').length,
+    shared: true,
+  };
+}
+
+export function createGuidedDemoState(source, { target = 8 } = {}) {
+  const cells = source.cells.map((cell) => ({
+    ...cell,
+    status: cell.status === 'pending' ? 'available' : cell.status,
+  }));
+  const base = {
+    ...source,
+    mode: 'camera',
+    modeLocked: false,
+    stage: 'ready',
+    safetyAcknowledged: true,
+    target,
+    countdown: 0,
+    creditedMs: 0,
+    graceMs: 0,
+    trackingMs: 0,
+    form: 'valid',
+    correction: null,
+    selectedCell: null,
+    requestedCell: null,
+    cells,
+    completions: 0,
+    completionMethod: null,
+    lastOutcome: null,
+    notice: '',
+    demo: true,
+  };
+  const available = cells.find((cell) => cell.status === 'available');
+  return available ? startAttempt(base, available.id) : base;
 }
 
 export function chooseMode(state, mode) {
@@ -116,10 +171,16 @@ export function tick(state, milliseconds) {
   const creditedMs = state.creditedMs + milliseconds;
   if (creditedMs < state.target * 1000) return { ...state, creditedMs };
   const cells = state.cells.map((item) => item.id === state.selectedCell ? { ...item, status: 'locked' } : item);
+  const demo = Boolean(state.demo);
   return {
     ...state, stage: 'complete', creditedMs: state.target * 1000, correction: null, cells,
-    completions: state.completions + 1, streak: state.streak + 1, todayCount: state.todayCount + 1,
-    target: Math.min(120, state.target + 2), completionMethod: state.mode, lastOutcome: 'complete', notice: 'PIXEL COMMITTED · NICE WORK',
+    completions: demo ? state.completions : state.completions + 1,
+    streak: demo ? state.streak : state.streak + 1,
+    todayCount: demo ? state.todayCount : state.todayCount + 1,
+    target: demo ? state.target : Math.min(120, state.target + 2),
+    completionMethod: demo ? 'guided-demo' : state.mode,
+    lastOutcome: 'complete',
+    notice: demo ? 'DEMO PIXEL COMPLETE · REAL PROGRESS UNCHANGED' : 'PIXEL COMMITTED · NICE WORK',
   };
 }
 

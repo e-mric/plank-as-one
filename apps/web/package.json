@@ -9,6 +9,9 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json",
     "test": "node --test test/*.test.mjs"
   },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.110.7"
+  },
   "devDependencies": {
     "@fontsource/pixelify-sans": "latest",
     "@sveltejs/adapter-auto": "latest",
