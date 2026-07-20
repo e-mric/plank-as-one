@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applySharedCanvasSnapshot, createGuidedDemoState, createInitialState, chooseMode, acknowledgeSafety, selectCell, confirmReadyPosition, tick, setForm, endSession, reduce, ARTWORK_WIDTH, ARTWORK_HEIGHT } from '../state.js';
+import { applySharedCanvasSnapshot, createGuidedDemoState, createInitialState, chooseMode, acknowledgeSafety, selectCell, confirmReadyPosition, tick, setForm, endSession, markDailyCompleted, reduce, ARTWORK_WIDTH, ARTWORK_HEIGHT } from '../state.js';
 
 const availableCell = (state, offset = 0) => state.cells.filter((cell) => cell.status === 'available')[offset].id;
 
@@ -17,6 +17,7 @@ test('camera is default, mode locks on pixel choice, and safety precedes reserva
   let s = createInitialState();
   assert.equal(s.mode, 'camera');
   assert.equal(s.stage, 'safety');
+  assert.equal(s.dailyCompleted, false);
   s = acknowledgeSafety(s);
   assert.equal(s.stage, 'ready');
   s = chooseMode(s, 'honor');
@@ -36,13 +37,28 @@ test('countdown enters active and honor mode commits at target', () => {
   s = selectCell(s, availableCell(s));
   s = tick(s, 3000);
   assert.equal(s.stage, 'active');
+  assert.equal(s.notice, '');
   s = tick(s, 2000);
   assert.equal(s.stage, 'complete');
   assert.equal(s.lastOutcome, 'complete');
   assert.equal(s.cells.find((cell) => cell.status === 'locked' && cell.id === s.selectedCell)?.status, 'locked');
   assert.equal(s.completions, 1);
   assert.equal(s.completionMethod, 'honor');
+  assert.equal(s.dailyCompleted, true);
+  assert.equal(s.existingDailyCompletion, false);
   assert.equal(s.target, 4);
+});
+
+test('an existing daily completion silently locks further mode and pixel selection', () => {
+  const ready = createInitialState({ stage: 'ready', safetyAcknowledged: true, notice: 'OLD NOTICE' });
+  const completed = markDailyCompleted(ready);
+  assert.equal(completed.stage, 'ready');
+  assert.equal(completed.dailyCompleted, true);
+  assert.equal(completed.existingDailyCompletion, true);
+  assert.equal(completed.modeLocked, true);
+  assert.equal(completed.notice, '');
+  assert.equal(chooseMode(completed, 'honor'), completed);
+  assert.equal(selectCell(completed, availableCell(completed)), completed);
 });
 
 test('camera waits for a detected ready position before starting the countdown', () => {
@@ -114,6 +130,7 @@ test('ending an attempt releases the pixel and mode lock for retry', () => {
   assert.equal(s.cells[cellId].status, 'available');
   assert.equal(s.selectedCell, null);
   assert.equal(s.modeLocked, false);
+  assert.equal(s.notice, '');
   s = chooseMode(s, 'camera');
   assert.equal(s.mode, 'camera');
   assert.equal(s.stage, 'ready');

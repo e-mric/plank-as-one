@@ -44,15 +44,24 @@
   let sharedActionPending = false;
   let sharedOwnedCellId: number | null = null;
   let sharedStatus = 'local';
+  let canvasNotice = '';
   let heartbeatInterval: ReturnType<typeof setInterval>;
   let poseDebugSession: any = null;
   let poseDebugStatus: any = { active: false, captureCount: 0, outputMode: '', lastDiagnostic: '', lastFile: '', error: '' };
 
   $: active = ['positioning', 'countdown', 'active', 'grace', 'paused'].includes(state.stage);
-  $: locked = state.stage !== 'ready';
+  $: sessionComplete = Boolean(state.dailyCompleted || state.stage === 'complete');
+  $: selectionLabel = state.existingDailyCompletion
+    ? 'YOUR PIXEL IS ALREADY LIVE 🔥'
+    : sessionComplete
+      ? 'YOUR PIXEL IS LIVE 🔥'
+      : state.lastOutcome === 'failed'
+        ? 'SELECT YOUR PIXEL AGAIN'
+        : 'SELECT YOUR PIXEL';
+  $: locked = state.stage !== 'ready' || sessionComplete;
   $: timerLabel = state.stage === 'countdown' ? String(Math.ceil(state.countdown)) : String(Math.floor(state.creditedMs / 1000)).padStart(2, '0');
   $: trackingVisible = state.form === 'tracking' && (state.trackingMs >= 500 || state.stage === 'paused');
-  $: showFormFeedback = state.mode === 'camera' && ['ready', 'positioning', 'countdown', 'active', 'grace', 'paused', 'complete'].includes(state.stage);
+  $: showFormFeedback = state.mode === 'camera' && ['positioning', 'countdown', 'active', 'grace', 'paused', 'complete'].includes(state.stage);
   $: formFeedbackLabel = state.lastOutcome === 'complete'
     ? state.demo ? 'DEMO COMPLETE' : 'POWER UP +2'
     : state.lastOutcome === 'failed'
@@ -95,11 +104,11 @@
 
   $: showCameraSetup = !guidedDemo && state.mode === 'camera' && state.stage === 'positioning';
   $: sharedStatusLabel = sharedStatus === 'live'
-    ? 'SHARED CANVAS LIVE'
+    ? ''
     : sharedStatus === 'connecting'
       ? 'SHARED CANVAS CONNECTING'
       : sharedStatus === 'error' || sharedStatus === 'offline'
-        ? sharedReady ? 'SHARED CANVAS DEGRADED' : 'SHARED OFFLINE · LOCAL FALLBACK'
+        ? sharedReady ? '' : 'SHARED OFFLINE · LOCAL FALLBACK'
         : 'LOCAL MOCK DATA';
 
   function dispatch(action: Action) {
@@ -165,7 +174,6 @@
 
   function describeSharedFailure(reason = '') {
     const labels: Record<string, string> = {
-      'already-completed': 'TODAY\'S SHARED PIXEL IS ALREADY COMPLETE',
       'active-reservation': 'YOU ALREADY HAVE AN ACTIVE PIXEL',
       'cell-unavailable': 'THAT PIXEL WAS JUST TAKEN · CHOOSE ANOTHER',
       'reservation-conflict': 'RESERVATION COLLISION · CHOOSE ANOTHER',
@@ -187,7 +195,7 @@
       const remoteStatus = rows.find((row) => row.cell_id === state.selectedCell)?.status;
       if (remoteStatus !== 'pending' && remoteStatus !== 'locked') {
         next = reduce(next, { type: 'end-session' });
-        next = { ...next, notice: 'SHARED RESERVATION EXPIRED · PICK A NEW PIXEL' };
+        canvasNotice = 'SHARED RESERVATION EXPIRED · PICK A NEW PIXEL';
         sharedOwnedCellId = null;
         stopCamera();
       }
@@ -197,6 +205,7 @@
 
   async function selectSharedCell(cellId: number) {
     if (sharedActionPending || state.stage !== 'ready') return;
+    canvasNotice = '';
     if (!sharedReady || !sharedService) {
       dispatch({ type: 'select-cell', cellId });
       return;
@@ -207,7 +216,12 @@
       const result = await sharedService.reserve(cellId);
       if (!result.ok) {
         sharedOwnedCellId = null;
-        state = { ...state, notice: describeSharedFailure(result.reason) };
+        if (result.reason === 'already-completed') {
+          dispatch({ type: 'mark-daily-completed' });
+          await sharedService.refresh();
+          return;
+        }
+        canvasNotice = describeSharedFailure(result.reason);
         await sharedService.refresh();
         return;
       }
@@ -220,7 +234,7 @@
     } catch {
       sharedOwnedCellId = null;
       sharedStatus = 'error';
-      state = { ...state, notice: describeSharedFailure() };
+      canvasNotice = describeSharedFailure();
     } finally {
       sharedActionPending = false;
     }
@@ -241,11 +255,11 @@
   async function commitSharedPixel(cellId: number, completionMethod: string) {
     try {
       const result = await sharedService.commit(cellId, completionMethod);
-      if (!result.ok) state = { ...state, notice: describeSharedFailure(result.reason) };
-      else sharedOwnedCellId = null;
+      if (!result.ok) canvasNotice = describeSharedFailure(result.reason);
+      else { sharedOwnedCellId = null; canvasNotice = ''; }
     } catch {
       sharedStatus = 'error';
-      state = { ...state, notice: 'WORKOUT COMPLETE · SHARED PIXEL COMMIT NEEDS RETRY' };
+      canvasNotice = 'WORKOUT COMPLETE · SHARED PIXEL COMMIT NEEDS RETRY';
     }
   }
 
@@ -364,10 +378,6 @@
     }
     state = next;
   }
-  function cancelSafety() {
-    state = { ...state, stage: 'ready', requestedCell: null, selectedCell: null, notice: '' };
-  }
-
   function waitForDemo(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
@@ -491,14 +501,14 @@
         class="chip mode-chip"
         class:selected={state.mode === 'camera'}
         aria-pressed={state.mode === 'camera'}
-        disabled={state.modeLocked || state.stage === 'safety'}
+        disabled={state.modeLocked || state.stage === 'safety' || sessionComplete}
         on:click={() => chooseMode('camera')}
       >Camera mode</button>
       <button
         class="chip mode-chip"
         class:selected={state.mode === 'honor'}
         aria-pressed={state.mode === 'honor'}
-        disabled={state.modeLocked || state.stage === 'safety'}
+        disabled={state.modeLocked || state.stage === 'safety' || sessionComplete}
         on:click={() => chooseMode('honor')}
       >Honor mode</button>
     </div>
@@ -598,8 +608,6 @@
       </div>
     </section>
   {/if}
-  <div class="privacy-note">ON-DEVICE ONLY</div>
-
   {#if state.stage === 'safety'}
     <div class="modal-backdrop">
       <div class="panel modal safety" role="dialog" aria-modal="true" aria-labelledby="safety-dialog-title" tabindex="-1">
@@ -607,9 +615,9 @@
         <p>Use a clear, stable exercise space. This application provides general fitness guidance, not medical advice.</p>
         <p><strong>Stop immediately</strong> if you experience concerning pain, chest pain or pressure, dizziness or faintness, unusual shortness of breath, or a pounding or irregular heartbeat.</p>
         <p>If you have a health condition, injury, or concerns about starting or increasing exercise, seek guidance from a qualified health professional.</p>
+        <p><strong>Camera privacy:</strong> Camera frames and pose calculations stay on this device and are not uploaded.</p>
         <div class="safety-actions">
           <button class="btn" on:click={startGuidedDemo}>VIEW GUIDED DEMO</button>
-          <button class="btn" on:click={cancelSafety}>GO BACK</button>
           <button class="btn primary" on:click={() => { void initializeAudio(); dispatch({ type: 'acknowledge-safety' }); }}>I UNDERSTAND</button>
         </div>
       </div>
@@ -617,23 +625,23 @@
   {/if}
 
   <section class="canvas-wrap" aria-label="Shared canvas">
-    <div class="canvas-meta"><span class:realtime={sharedStatus === 'live'}>{sharedStatusLabel}</span><span>{state.cells.filter((c: Pixel) => c.status === 'locked').length} PIXELS LIVE · {state.liveCount} ACTIVE</span></div>
-    {#if state.notice}<div class="state-notice" aria-live="polite">{state.notice}</div>{/if}
+    <div class="canvas-meta">{#if sharedStatusLabel}<span>{sharedStatusLabel}</span>{/if}<span class="canvas-count">{state.cells.filter((c: Pixel) => c.status === 'locked').length} PIXELS LIVE · {state.liveCount} ACTIVE</span></div>
+    {#if canvasNotice}<div class="state-notice" aria-live="polite">{canvasNotice}</div>{/if}
 
     <div class="canvas" style={`--art-width:${GRID_WIDTH}`} role="grid" aria-label="OPENAI BUILD WEEK shared pixel artwork. Select an outlined target pixel.">
       {#each state.cells as cell (cell.id)}
         <button class:target={cell.target} class:empty={!cell.target} class:locked={cell.status === 'locked'} class:pending={cell.status === 'pending'} class:other={cell.status === 'other'} class="cell" disabled={cell.status !== 'available' || locked || sharedActionPending} on:click={() => void selectSharedCell(cell.id)} aria-label={cell.target ? `Artwork pixel ${cell.id + 1}, ${cell.status}` : 'Artwork background'} aria-pressed={cell.status === 'pending'}></button>
       {/each}
     </div>
-    {#if state.stage === 'ready'}
-      <div class="validation selection-chip">SELECT YOUR PIXEL</div>
+    {#if state.stage === 'ready' || state.stage === 'complete'}
+      <div class="validation selection-chip">{selectionLabel}</div>
     {/if}
   </section>
 
   <div class="controls">
     {#if guidedDemo}
       <span class="chip">ISOLATED DEMO · NO PROGRESS SAVED</span>
-    {:else if active}<button class="btn" on:click={() => void endSharedSession()}>END SESSION · RELEASE PIXEL</button>{:else if state.stage === 'complete'}<span class="chip">YOUR PIXEL IS LIVE 🔥</span>{/if}
+    {:else if active}<button class="btn" on:click={() => void endSharedSession()}>END SESSION · RELEASE PIXEL</button>{/if}
   </div>
 
 </main>
@@ -644,16 +652,16 @@
   .status-row { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }.status-group { display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
   .chip { display:inline-flex; align-items:center; min-height:38px; padding:9px 13px; border:1px solid var(--line); border-radius:999px; background:rgba(255,250,245,.88); color:var(--muted); font:700 11px/1 var(--mono); letter-spacing:.02em; }
   .hero { width:min(650px,100%); margin:58px auto 0; text-align:center; }.brand-title { margin:0 0 10px; color:var(--coral); font:700 clamp(30px,6vw,52px)/.95 var(--mono); letter-spacing:.04em; }.mode-selector { display:flex; justify-content:center; gap:10px; }.mode-chip { min-height:34px; background:transparent; cursor:pointer; }.mode-chip.selected { border-color:var(--coral); color:var(--coral-dark); box-shadow:0 0 0 2px rgba(255,90,54,.12); }.mode-chip:disabled { cursor:not-allowed; opacity:.6; }.mode-chip.selected:disabled { opacity:1; }.timer { margin:0; font:700 clamp(52px,11vw,108px)/.9 var(--mono); letter-spacing:-.08em; }.timer small { font-size:.22em; letter-spacing:0; margin-left:8px; color:var(--muted); }.validation { display:inline-flex; align-items:center; gap:8px; margin-top:16px; padding:9px 13px; border:1px solid var(--line); border-radius:999px; color:var(--muted); background:rgba(255,250,245,.85); font:700 10px var(--mono); }.selection-chip { display:flex; width:max-content; margin:16px auto 0; background:transparent; }
-  .pose-stage { position:relative; display:grid; align-items:center; width:min(900px,100%); min-height:210px; margin:22px auto 0; }.pose-slot { width:min(560px,100%); margin:0 auto; text-align:center; }.pose-slot img { display:block; width:100%; height:auto; max-height:180px; object-fit:contain; image-rendering:pixelated; }.pose-slot img.hips-low { transform:scale(.68); transform-origin:center; }.pose-slot img.hips-high { transform:scale(.7); transform-origin:center; }.pose-slot img.exhausted { max-height:105px; }.celebration-sequence { position:relative; width:100%; height:180px; }.pose-slot img.celebration-frame { position:absolute; inset:0; width:100%; height:100%; max-height:none; object-fit:contain; opacity:0; animation:celebration-frame-slot var(--celebration-duration) steps(1,end) forwards; animation-delay:var(--celebration-delay); }.pose-slot img.celebration-frame.celebration-final { animation:celebration-final-frame 1ms linear forwards; animation-delay:var(--celebration-delay); }.form-feedback { margin:10px auto 0; text-align:center; }.form-feedback-label { color:var(--ink); font:700 12px/1 var(--mono); letter-spacing:.04em; }.grace-cells { display:flex; justify-content:center; gap:12px; margin-top:12px; }.grace-cell { width:27px; height:27px; border:2px solid var(--coral); border-radius:5px; background:transparent; box-sizing:border-box; }.grace-cell.filled { background:var(--coral); box-shadow:inset 0 0 0 1px rgba(255,255,255,.2); }.privacy-note { margin:10px auto 0; color:var(--muted); font:700 10px var(--mono); text-align:center; }
+  .pose-stage { position:relative; display:grid; align-items:center; width:min(900px,100%); min-height:210px; margin:22px auto 0; }.pose-slot { width:min(560px,100%); margin:0 auto; text-align:center; }.pose-slot img { display:block; width:100%; height:auto; max-height:180px; object-fit:contain; image-rendering:pixelated; }.pose-slot img.hips-low { transform:scale(.68); transform-origin:center; }.pose-slot img.hips-high { transform:scale(.7); transform-origin:center; }.pose-slot img.exhausted { max-height:105px; }.celebration-sequence { position:relative; width:100%; height:180px; }.pose-slot img.celebration-frame { position:absolute; inset:0; width:100%; height:100%; max-height:none; object-fit:contain; opacity:0; animation:celebration-frame-slot var(--celebration-duration) steps(1,end) forwards; animation-delay:var(--celebration-delay); }.pose-slot img.celebration-frame.celebration-final { animation:celebration-final-frame 1ms linear forwards; animation-delay:var(--celebration-delay); }.form-feedback { margin:10px auto 0; text-align:center; }.form-feedback-label { color:var(--ink); font:700 12px/1 var(--mono); letter-spacing:.04em; }.grace-cells { display:flex; justify-content:center; gap:12px; margin-top:12px; }.grace-cell { width:27px; height:27px; border:2px solid var(--coral); border-radius:5px; background:transparent; box-sizing:border-box; }.grace-cell.filled { background:var(--coral); box-shadow:inset 0 0 0 1px rgba(255,255,255,.2); }
   .camera-setup { display:grid; grid-template-columns:minmax(240px,360px) minmax(220px,1fr); gap:18px; align-items:center; width:min(760px,100%); margin:0 auto 18px; padding:14px; border:1px solid var(--line); border-radius:14px; background:rgba(255,250,245,.82); }.camera-preview-wrap { position:relative; overflow:hidden; aspect-ratio:16/9; border:1px solid var(--line); border-radius:9px; background:#2d2421; }.camera-preview { display:block; width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }.framing-guide { position:absolute; inset:14% 7%; display:grid; place-items:center; border:2px dashed rgba(255,250,245,.82); border-radius:42%; pointer-events:none; }.framing-guide span { width:45%; height:2px; background:rgba(255,250,245,.6); }.camera-loading { position:absolute; inset:0; display:grid; place-items:center; padding:10px; background:rgba(36,25,22,.62); color:#fffaf5; text-align:center; font:700 12px var(--mono); }.camera-copy { display:flex; flex-direction:column; gap:8px; color:var(--muted); font:700 11px/1.35 var(--mono); }.camera-copy strong { color:var(--coral-dark); font-size:16px; }.audio-check { display:flex; flex-wrap:wrap; align-items:center; gap:7px; margin-top:5px; }.audio-check span { width:100%; color:var(--ink); }.audio-check .btn,.camera-copy > .btn { padding:8px 10px; font-size:9px; }
   .pose-visual { position:relative; width:100%; height:180px; }.pose-visual > img { height:100%; max-height:none; }.body-region-highlight { position:absolute; z-index:2; top:54%; left:48%; width:52px; height:52px; transform:translate(-50%,-50%); border:3px solid var(--coral); border-radius:50%; background:rgba(255,90,54,.24); box-shadow:0 0 0 8px rgba(255,90,54,.12); animation:region-pulse .8s steps(2,end) infinite; pointer-events:none; }.correction-arrow-slot { display:flex; align-items:center; justify-content:center; height:54px; }.pixel-correction-arrow { position:relative; display:block; width:48px; height:36px; transform:rotate(-90deg); transform-origin:center; filter:drop-shadow(2px 2px 0 rgba(255,90,54,.22)); image-rendering:pixelated; }.pixel-correction-arrow::before,.pixel-correction-arrow::after { content:""; position:absolute; display:block; }.pixel-correction-arrow::before { inset:0; background:var(--coral-dark); clip-path:polygon(0 22%,50% 22%,50% 0,67% 0,67% 11%,75% 11%,75% 22%,83% 22%,83% 33%,92% 33%,92% 44%,100% 44%,100% 56%,92% 56%,92% 67%,83% 67%,83% 78%,75% 78%,75% 89%,67% 89%,67% 100%,50% 100%,50% 78%,0 78%); }.pixel-correction-arrow::after { inset:4px; background:linear-gradient(180deg,var(--peach) 0 34%,#ff9c68 34% 64%,var(--coral) 64% 82%,var(--coral-dark) 82% 100%); clip-path:polygon(0 21%,50% 21%,50% 0,65% 0,65% 11%,73% 11%,73% 21%,81% 21%,81% 32%,89% 32%,89% 43%,100% 43%,100% 57%,89% 57%,89% 68%,81% 68%,81% 79%,73% 79%,73% 89%,65% 89%,65% 100%,50% 100%,50% 79%,0 79%); }.pixel-correction-arrow.down { transform:rotate(90deg); }
   .modal-backdrop { position:fixed; inset:0; z-index:20; display:grid; place-items:center; padding:24px; overflow-y:auto; background:rgba(255,244,234,.72); backdrop-filter:blur(5px); }.panel { margin:26px auto 0; width:min(660px,100%); border:1px solid var(--line); border-radius:16px; background:rgba(255,250,245,.96); padding:18px; box-shadow:0 18px 60px rgba(120,61,35,.18); }.panel.modal { width:min(620px,calc(100vw - 48px)); max-height:calc(100vh - 48px); margin:0; overflow-y:auto; }.panel h2 { margin:0 0 8px; font-size:18px; }.panel p { margin:7px 0; color:var(--muted); line-height:1.45; font-size:14px; }.btn { border:1px solid var(--coral); border-radius:999px; padding:10px 15px; background:transparent; color:var(--coral-dark); font:700 11px var(--mono); letter-spacing:.02em; }.btn:hover,.btn.primary { background:var(--coral); color:#fff; }.safety { text-align:left; }.safety h2 { font:700 14px var(--mono); letter-spacing:.06em; }.safety strong { color:var(--coral-dark); }.safety-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:14px; }
-  .canvas-wrap { position:relative; width:min(760px,100%); margin:38px auto 0; }.canvas-meta { display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:4px; }.canvas-meta span { color:var(--muted); font:700 10px var(--mono); }.canvas-meta span.realtime { color:#267a45; }.state-notice { margin:7px 0 10px; color:var(--coral-dark); font:700 10px/1.3 var(--mono); text-align:center; }
+  .canvas-wrap { position:relative; width:min(760px,100%); margin:38px auto 0; }.canvas-meta { display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:4px; }.canvas-meta span { color:var(--muted); font:700 10px var(--mono); }.canvas-meta .canvas-count { margin-left:auto; }.state-notice { margin:7px 0 10px; color:var(--coral-dark); font:700 10px/1.3 var(--mono); text-align:center; }
   .canvas { display:grid; grid-template-columns:repeat(var(--art-width),1fr); gap:2px; width:min(720px,100%); margin:0 auto; padding:18px; border:0; background:transparent; }.cell { aspect-ratio:1; min-width:0; border:0; border-radius:1px; background:transparent; padding:0; transition:transform .1s ease,filter .1s; }.cell.target { border:1px solid rgba(255,164,127,.68); background:rgba(255,228,210,.48); }.cell.target:not(:disabled):hover,.cell.target:not(:disabled):focus-visible { transform:scale(1.16); filter:brightness(.96); outline:2px solid var(--coral); outline-offset:1px; }.cell.locked { border-color:var(--coral); background:var(--coral); }.cell.pending,.cell.other { border-color:var(--coral); background:var(--coral); animation:pulse 1.25s ease-in-out infinite; box-shadow:0 0 0 4px rgba(255,90,54,.16); }.cell.other { opacity:.65; animation-delay:-.45s; transform:scale(.72); }.cell.empty { pointer-events:none; }
   @keyframes pulse { 50% { transform:scale(1.12); box-shadow:0 0 0 10px rgba(255,90,54,0); } }.controls { display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:18px; }.dev-tools { position:absolute; top:50%; right:-30px; transform:translateY(-50%); display:flex; width:190px; max-height:440px; overflow:auto; flex-direction:column; gap:8px; padding:12px; border:1px dashed var(--coral); border-radius:12px; background:rgba(255,250,245,.97); box-shadow:0 10px 30px rgba(120,61,35,.12); }.dev-tools strong { color:var(--muted); font:700 10px var(--mono); text-align:center; letter-spacing:.08em; }.dev-tools .btn { padding:8px 9px; font-size:9px; }.dev-tools hr { width:100%; margin:2px 0; border:0; border-top:1px dashed var(--line); }.dev-log-status { color:#267a45; font:800 10px/1.2 var(--mono); text-align:center; }.dev-log-detail,.dev-log-error { color:var(--muted); font:700 8px/1.35 var(--mono); text-align:center; }.dev-log-error { color:var(--coral-dark); }
   .camera-setup.camera-runtime-hidden { position:fixed; top:0; left:-10000px; width:2px; height:2px; min-height:0; margin:0; padding:0; overflow:hidden; border:0; opacity:0; pointer-events:none; }
   @media(max-width:900px){.pose-stage{display:block;min-height:0}.camera-setup{grid-template-columns:1fr;width:min(560px,100%)}.camera-setup.camera-runtime-hidden{width:2px}.dev-tools{position:static;transform:none;width:min(560px,100%);margin:14px auto 0;flex-direction:row;flex-wrap:wrap;justify-content:center}.dev-tools strong{width:100%}}
-  @media(max-width:600px){.page{padding:20px 15px 32px}.demo-banner{position:relative;top:0;align-items:flex-start;flex-direction:column}.demo-banner-actions{width:100%;justify-content:flex-end}.status-row{align-items:flex-start}.status-row .mode-selector{gap:5px}.chip{font-size:9px;min-height:32px;padding:8px 9px}.hero{margin-top:44px}.modal-backdrop{padding:15px}.panel{padding:15px}.panel.modal{width:min(620px,calc(100vw - 30px));max-height:calc(100vh - 30px)}.canvas{gap:1px;padding:8px}.grace-cells{gap:8px}.grace-cell{width:24px;height:24px}.privacy-note{font-size:8px}}
+  @media(max-width:600px){.page{padding:20px 15px 32px}.demo-banner{position:relative;top:0;align-items:flex-start;flex-direction:column}.demo-banner-actions{width:100%;justify-content:flex-end}.status-row{align-items:flex-start}.status-row .mode-selector{gap:5px}.chip{font-size:9px;min-height:32px;padding:8px 9px}.hero{margin-top:44px}.modal-backdrop{padding:15px}.panel{padding:15px}.panel.modal{width:min(620px,calc(100vw - 30px));max-height:calc(100vh - 30px)}.canvas{gap:1px;padding:8px}.grace-cells{gap:8px}.grace-cell{width:24px;height:24px}}
   @media(prefers-reduced-motion:reduce){.cell.pending,.cell.other{animation:none;box-shadow:0 0 0 7px rgba(255,90,54,.16)}.body-region-highlight{animation:none}.pose-slot img.celebration-frame{display:none;animation:none}.pose-slot img.celebration-frame:last-child{display:block;opacity:1}}
   .pixel-correction-arrow.sideways { transform:rotate(0deg); }.pixel-correction-arrow.sideways.back { transform:rotate(180deg); }
   @keyframes region-pulse { 50% { transform:translate(-50%,-50%) scale(1.18); box-shadow:0 0 0 14px rgba(255,90,54,0); } }

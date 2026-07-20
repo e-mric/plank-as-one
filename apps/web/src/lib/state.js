@@ -38,6 +38,8 @@ export function createInitialState(overrides = {}) {
     todayCount: 128,
     streak: 7,
     completions: 0,
+    dailyCompleted: false,
+    existingDailyCompletion: false,
     completionMethod: null,
     lastOutcome: null,
     notice: '',
@@ -91,6 +93,8 @@ export function createGuidedDemoState(source, { target = 8 } = {}) {
     requestedCell: null,
     cells,
     completions: 0,
+    dailyCompleted: false,
+    existingDailyCompletion: false,
     completionMethod: null,
     lastOutcome: null,
     notice: '',
@@ -102,7 +106,7 @@ export function createGuidedDemoState(source, { target = 8 } = {}) {
 
 export function chooseMode(state, mode) {
   if (!['camera', 'honor'].includes(mode)) return state;
-  if (state.modeLocked || state.stage !== 'ready' || state.completions > 0) return state;
+  if (state.modeLocked || state.stage !== 'ready' || state.completions > 0 || state.dailyCompleted) return state;
   return { ...state, mode, notice: '' };
 }
 
@@ -123,7 +127,7 @@ function startAttempt(state, cellId) {
 }
 
 export function selectCell(state, cellId) {
-  if (state.stage !== 'ready' || !state.mode) return state;
+  if (state.stage !== 'ready' || !state.mode || state.dailyCompleted) return state;
   const cell = state.cells.find((item) => item.id === cellId);
   if (!cell || cell.status !== 'available') return state;
   if (!state.safetyAcknowledged) {
@@ -156,7 +160,7 @@ export function tick(state, milliseconds) {
   if (!Number.isFinite(milliseconds) || milliseconds <= 0) return state;
   if (state.stage === 'countdown') {
     const remaining = state.countdown - milliseconds / 1000;
-    return remaining > 0 ? { ...state, countdown: remaining } : { ...state, stage: 'active', countdown: 0, notice: state.mode === 'honor' ? 'FORM NOT CAMERA-VALIDATED' : 'FORM VALIDATED · TIME COUNTING' };
+    return remaining > 0 ? { ...state, countdown: remaining } : { ...state, stage: 'active', countdown: 0, notice: '' };
   }
   if (state.stage !== 'active' && state.stage !== 'grace') return state;
   if (state.mode === 'camera' && state.form === 'tracking') {
@@ -173,7 +177,7 @@ export function tick(state, milliseconds) {
   const cells = state.cells.map((item) => item.id === state.selectedCell ? { ...item, status: 'locked' } : item);
   const demo = Boolean(state.demo);
   return {
-    ...state, stage: 'complete', creditedMs: state.target * 1000, correction: null, cells,
+    ...state, stage: 'complete', creditedMs: state.target * 1000, correction: null, cells, dailyCompleted: !demo, existingDailyCompletion: false,
     completions: demo ? state.completions : state.completions + 1,
     streak: demo ? state.streak : state.streak + 1,
     todayCount: demo ? state.todayCount : state.todayCount + 1,
@@ -187,7 +191,11 @@ export function tick(state, milliseconds) {
 export function endSession(state) {
   if (!['positioning', 'countdown', 'active', 'grace', 'paused'].includes(state.stage)) return state;
   const cells = state.cells.map((item) => item.id === state.selectedCell ? { ...item, status: 'available' } : item);
-  return { ...state, stage: 'ready', modeLocked: false, cells, selectedCell: null, countdown: 0, creditedMs: 0, graceMs: 0, trackingMs: 0, correction: null, lastOutcome: 'failed', notice: 'SESSION RELEASED · PICK A NEW CELL TO RETRY' };
+  return { ...state, stage: 'ready', modeLocked: false, cells, selectedCell: null, countdown: 0, creditedMs: 0, graceMs: 0, trackingMs: 0, correction: null, lastOutcome: 'failed', notice: '' };
+}
+
+export function markDailyCompleted(state) {
+  return { ...state, dailyCompleted: true, existingDailyCompletion: true, modeLocked: true, notice: '' };
 }
 
 export function reduce(state, action) {
@@ -198,6 +206,7 @@ export function reduce(state, action) {
     case 'confirm-ready-position': return confirmReadyPosition(state);
     case 'set-form': return setForm(state, action.form, action.correction);
     case 'pose-update': return applyPoseUpdate(state, action);
+    case 'mark-daily-completed': return markDailyCompleted(state);
     case 'tick': return tick(state, action.ms);
     case 'end-session': return endSession(state);
     default: return state;
