@@ -19,9 +19,10 @@ If the browser does not support directory selection, the logger falls back to in
 Automatic capture occurs:
 
 - On the first analyzed pose frame.
-- Whenever the phase or diagnostic label changes.
+- Immediately when the workout phase changes.
+- When a diagnostic label remains stable for 400 ms, filtering single-frame confidence flicker.
 - Every 2.5 seconds while the state remains stable.
-- Up to 90 screenshots per session.
+- Up to 240 screenshots per session. Reaching the limit no longer ends the logging session, so the manifest can still be exported explicitly.
 
 Initial-framing images distinguish `MOVE CLOSER`, `MOVE BACK`, directional positioning, `HOLD STILL`, and `FRAMING READY`. Plank-analysis images distinguish good form, tracking loss, hips high/low, knee extension, neck alignment, shoulder position, and elbow alignment.
 
@@ -35,6 +36,8 @@ Every PNG contains:
 - Framing, confidence, occupancy, normalized hip offset, shoulder stack, model, phase, and pose-rule version.
 
 Every PNG has a JSON file with the same basename. JSON records contain the timestamp, capture reason, keypoints, computed features, framing quality, selected correction, model name, and configuration version. `session-manifest.json` lists the complete session and stop reason.
+
+The camera video remains mounted off-screen after positioning so the same stream and inference scheduler continue through countdown, active exercise, correction grace, and paused states. The tracking gate tolerates one marginal-confidence landmark and bridges confidence gaps up to 250 ms; longer or broader losses are still reported as tracking loss. Edge clipping is evaluated before body occupancy, preventing a cropped close-up from being mislabeled as too far away.
 
 ## Evidence review workflow
 

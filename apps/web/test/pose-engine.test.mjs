@@ -6,6 +6,7 @@ import { createTemporalSmoother } from '../src/lib/pose/smoothing.js';
 import { createStableSideSelector } from '../src/lib/pose/side-selector.js';
 import { createPoseAnalyzer } from '../src/lib/pose/engine.js';
 import { extractFeatures } from '../src/lib/pose/features.js';
+import { describeFraming } from '../src/lib/pose/setup-machine.js';
 
 const keypoints = (hipY = 0.4, confidence = 0.95) => [
   ['left_shoulder', 0.3, 0.4], ['left_elbow', 0.3, 0.5], ['left_wrist', 0.4, 0.5],
@@ -38,6 +39,30 @@ test('landmark normalization and quality gate reject missing or low-confidence l
   assert.equal(qualityGate(missing).tracked, false);
 });
 
+test('quality gate tolerates one marginal landmark but not a broadly weak pose', () => {
+  const oneMarginal = pose();
+  oneMarginal.keypoints.find((point) => point.name === 'left_wrist').score = 0.25;
+  const quality = qualityGate(normalizeLandmarks(oneMarginal, 1000, 1000));
+  assert.equal(quality.tracked, true);
+  assert.equal(quality.visibleLandmarkCount, 5);
+  assert.equal(quality.supportedLandmarkCount, 6);
+
+  const broadlyWeak = qualityGate(normalizeLandmarks(pose(0.4, 0.25), 1000, 1000));
+  assert.equal(broadlyWeak.tracked, false);
+});
+
+test('cropped bodies are told to move back before occupancy is considered', () => {
+  assert.equal(describeFraming({
+    tracked: true,
+    pointCount: 6,
+    requiredLandmarksVisible: true,
+    clipped: true,
+    margin: -0.018,
+    occupancy: 0.34,
+    centered: true,
+  }), 'MOVE BACK');
+});
+
 test('smoothing clears continuity after a long tracking gap', () => {
   const smoother = createTemporalSmoother({ timeConstantMs: 80, maxContinuityMs: 180 });
   smoother.update({ hip: { x: 0, y: 0, score: 1 } }, 0);
@@ -60,7 +85,11 @@ test('analyzer distinguishes stable readiness, tracking loss, and hip correction
   const valid = analyzer.analyze(pose(), { width: 1000, height: 1000, now: 0 });
   assert.equal(valid.form, 'valid');
   assert.equal(analyzer.analyze(pose(), { width: 1000, height: 1000, now: 800 }).setupReady, true);
-  assert.equal(analyzer.analyze({ keypoints: [] }, { width: 1000, height: 1000, now: 900 }).form, 'tracking');
+  const transientLoss = analyzer.analyze({ keypoints: [] }, { width: 1000, height: 1000, now: 900 });
+  assert.equal(transientLoss.tracking, true);
+  assert.equal(transientLoss.quality.transientLoss, true);
+  assert.equal(transientLoss.setupMessage, 'HOLD STILL');
+  assert.equal(analyzer.analyze({ keypoints: [] }, { width: 1000, height: 1000, now: 1100 }).form, 'tracking');
 
   const correctionAnalyzer = createPoseAnalyzer();
   correctionAnalyzer.analyze(pose(), { width: 1000, height: 1000, now: 0 });

@@ -30,13 +30,31 @@ export function qualityGate(landmarks, { minConfidence = POSE_RULE_CONFIG.minReq
   const side = leftScore >= rightScore ? 'left' : 'right';
   const names = sideNames(side);
   const points = names.map((name) => landmarks[name]).filter(Boolean);
-  const requiredLandmarksVisible = names.every((name) => landmarks[name]?.score >= minConfidence);
-  if (!points.length) return { tracked: false, requiredLandmarksVisible: false, side, leftScore, rightScore, margin: 0, occupancy: 0, centered: false };
-  const xs = points.map((point) => point.x); const ys = points.map((point) => point.y);
+  const scores = names.map((name) => landmarks[name]?.score ?? 0);
+  const visibleLandmarkCount = scores.filter((score) => score >= minConfidence).length;
+  const supportedLandmarkCount = scores.filter((score) => score >= POSE_RULE_CONFIG.minFallbackConfidence).length;
+  const selectedMeanScore = scores.reduce((sum, score) => sum + score, 0) / names.length;
+  const requiredLandmarksVisible = points.length === names.length
+    && visibleLandmarkCount >= POSE_RULE_CONFIG.minRequiredLandmarkCount
+    && supportedLandmarkCount === names.length
+    && selectedMeanScore >= POSE_RULE_CONFIG.minMeanConfidence;
+  const geometryPoints = points.filter((point) => point.score >= POSE_RULE_CONFIG.minFallbackConfidence);
+  if (!geometryPoints.length) return {
+    tracked: false, requiredLandmarksVisible: false, side, leftScore, rightScore,
+    selectedMeanScore, visibleLandmarkCount, supportedLandmarkCount, pointCount: points.length,
+    margin: 0, occupancy: 0, centered: false, clipped: false,
+  };
+  const xs = geometryPoints.map((point) => point.x); const ys = geometryPoints.map((point) => point.y);
   const minX = Math.min(...xs); const maxX = Math.max(...xs); const minY = Math.min(...ys); const maxY = Math.max(...ys);
   const occupancy = maxX - minX;
-  const margin = Math.min(minX, 1 - maxX, minY, 1 - maxY);
+  const edgeMargins = { left: minX, right: 1 - maxX, top: minY, bottom: 1 - maxY };
+  const margin = Math.min(...Object.values(edgeMargins));
   const center = (minX + maxX) / 2;
-  return { tracked: requiredLandmarksVisible, requiredLandmarksVisible, side, leftScore, rightScore, margin, occupancy, centered: center >= 0.18 && center <= 0.82, centerDirection: center < 0.18 ? 'left' : 'right', points };
+  return {
+    tracked: requiredLandmarksVisible, requiredLandmarksVisible, side, leftScore, rightScore,
+    selectedMeanScore, visibleLandmarkCount, supportedLandmarkCount, pointCount: points.length,
+    margin, edgeMargins, clipped: margin <= POSE_RULE_CONFIG.framing.clippedMargin, occupancy,
+    centered: center >= 0.18 && center <= 0.82, centerDirection: center < 0.18 ? 'left' : 'right', points: geometryPoints,
+  };
 }
 

@@ -1,11 +1,15 @@
 export const POSE_RULE_CONFIG = {
-  version: 'movenet-plank-v1',
-  minRequiredConfidence: 0.4,
+  version: 'movenet-plank-v2',
+  minRequiredConfidence: 0.35,
+  minFallbackConfidence: 0.2,
+  minRequiredLandmarkCount: 5,
+  minMeanConfidence: 0.45,
+  trackingLossGraceMs: 250,
   trackingDebounceMs: 500,
   correctionGraceMs: 5000,
   correctionLockMs: 750,
   smoothingTimeConstantMs: 80,
-  framing: { minMargin: 0.08, minOccupancy: 0.55, maxOccupancy: 0.9, stableMs: 800 },
+  framing: { clippedMargin: 0.02, minMargin: 0.05, minOccupancy: 0.55, maxOccupancy: 0.9, stableMs: 800 },
   rules: {
     hipOffset: { enterError: 0.10, leaveError: 0.06, enterDurationMs: 200, recoveryDurationMs: 300 },
     shoulderStack: { enterError: 0.16, leaveError: 0.10, enterDurationMs: 200, recoveryDurationMs: 300 },

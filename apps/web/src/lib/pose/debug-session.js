@@ -16,19 +16,37 @@ function downloadBlob(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function getPoseCaptureDecision({ lastSignature = '', lastCaptureAt = -Infinity, stage, result, frameTimeMs, minIntervalMs = 2500 }) {
+export function getPoseCaptureDecision({
+  lastSignature = '',
+  lastCaptureAt = -Infinity,
+  stage,
+  result,
+  frameTimeMs,
+  candidateSignature = '',
+  candidateSince = frameTimeMs,
+  minIntervalMs = 2500,
+  stateChangeDwellMs = 400,
+}) {
   const diagnostic = getPoseDiagnosticLabel(result, stage);
   const signature = `${stage}:${diagnostic}`;
+  const previousStage = lastSignature.split(':', 1)[0];
+  const stageChanged = Boolean(lastSignature && previousStage !== stage);
+  const firstCapture = !lastSignature;
   const stateChanged = signature !== lastSignature;
+  const sameCandidate = signature === candidateSignature;
+  const resolvedCandidateSince = sameCandidate ? candidateSince : frameTimeMs;
+  const stableStateChange = stateChanged && sameCandidate && frameTimeMs - resolvedCandidateSince >= stateChangeDwellMs;
   const periodic = frameTimeMs - lastCaptureAt >= minIntervalMs;
   return {
-    capture: stateChanged || periodic,
-    reason: stateChanged ? 'state-change' : periodic ? 'periodic' : null,
+    capture: firstCapture || stageChanged || stableStateChange || periodic,
+    reason: firstCapture || stageChanged || stableStateChange ? 'state-change' : periodic ? 'periodic' : null,
     signature,
+    candidateSignature: signature,
+    candidateSince: resolvedCandidateSince,
   };
 }
 
-export function createPoseDebugSession({ minIntervalMs = 2500, maxCaptures = 90, onUpdate = () => {} } = {}) {
+export function createPoseDebugSession({ minIntervalMs = 2500, stateChangeDwellMs = 400, maxCaptures = 240, onUpdate = () => {} } = {}) {
   let active = false;
   let directoryHandle = null;
   let sessionDirectory = null;
@@ -37,6 +55,8 @@ export function createPoseDebugSession({ minIntervalMs = 2500, maxCaptures = 90,
   let captureCount = 0;
   let lastCaptureAt = -Infinity;
   let lastSignature = '';
+  let candidateSignature = '';
+  let candidateSince = -Infinity;
   let lastFrame = null;
   let pendingWrites = Promise.resolve();
   let captureSettled = Promise.resolve();
@@ -53,6 +73,7 @@ export function createPoseDebugSession({ minIntervalMs = 2500, maxCaptures = 90,
       lastDiagnostic: lastFrame?.result ? getPoseDiagnosticLabel(lastFrame.result, lastFrame.stage) : '',
       lastFile: manifest.at(-1)?.image || '',
       error: lastError,
+      captureLimitReached: captureCount >= maxCaptures,
       ...extra,
     };
   }
@@ -85,6 +106,8 @@ export function createPoseDebugSession({ minIntervalMs = 2500, maxCaptures = 90,
     captureCount = 0;
     lastCaptureAt = -Infinity;
     lastSignature = '';
+    candidateSignature = '';
+    candidateSince = -Infinity;
     manifest = [];
     pendingWrites = Promise.resolve();
     captureSettled = Promise.resolve();
@@ -123,6 +146,8 @@ export function createPoseDebugSession({ minIntervalMs = 2500, maxCaptures = 90,
         captureCount += 1;
         lastCaptureAt = frame.frameTimeMs ?? performance.now();
         lastSignature = `${frame.stage}:${record.diagnostic}`;
+        candidateSignature = lastSignature;
+        candidateSince = lastCaptureAt;
         manifest.push(manifestEntry);
         pendingWrites = pendingWrites.then(async () => {
           await writeFile(imageName, imageBlob);
@@ -148,11 +173,26 @@ export function createPoseDebugSession({ minIntervalMs = 2500, maxCaptures = 90,
     lastFrame = frame;
     if (!active || !frame?.result) return false;
     if (captureCount >= maxCaptures) {
-      await stop('capture-limit');
+      if (!lastError) {
+        lastError = `Automatic capture limit reached (${maxCaptures}). Stop the log to export its manifest.`;
+        notify();
+      }
       return false;
     }
     const frameTime = frame.frameTimeMs ?? performance.now();
-    const decision = getPoseCaptureDecision({ lastSignature, lastCaptureAt, stage: frame.stage, result: frame.result, frameTimeMs: frameTime, minIntervalMs });
+    const decision = getPoseCaptureDecision({
+      lastSignature,
+      lastCaptureAt,
+      candidateSignature,
+      candidateSince,
+      stage: frame.stage,
+      result: frame.result,
+      frameTimeMs: frameTime,
+      minIntervalMs,
+      stateChangeDwellMs,
+    });
+    candidateSignature = decision.candidateSignature;
+    candidateSince = decision.candidateSince;
     if (!decision.capture) return false;
     return capture(frame, decision.reason);
   }

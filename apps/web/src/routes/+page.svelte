@@ -135,7 +135,8 @@
       const { createPoseDebugSession } = await import('$lib/pose/debug-session.js');
       poseDebugSession = createPoseDebugSession({
         minIntervalMs: 2500,
-        maxCaptures: 90,
+        stateChangeDwellMs: 400,
+        maxCaptures: 240,
         onUpdate: (status: any = {}) => { poseDebugStatus = { ...status }; },
       });
       poseDebugStatus = { ...poseDebugSession.status };
@@ -510,24 +511,26 @@
   </section>
 
   <div class="pose-stage">
-    {#if showCameraSetup}
-      <section class="camera-setup" aria-label="Camera setup">
+    {#if !guidedDemo && state.mode === 'camera' && active}
+      <section class:camera-runtime-hidden={!showCameraSetup} class="camera-setup" aria-label="Camera setup" aria-hidden={!showCameraSetup}>
         <div class="camera-preview-wrap">
           <video bind:this={videoEl} class="camera-preview" autoplay playsinline muted aria-label="Mirrored camera preview"></video>
           <div class="framing-guide" aria-hidden="true"><span></span></div>
           {#if cameraStatus === 'requesting' || cameraStatus === 'loading'}<div class="camera-loading">{cameraStatus === 'requesting' ? 'REQUESTING CAMERA' : 'LOADING POSE MODEL'}</div>{/if}
         </div>
-        <div class="camera-copy">
-          <strong>{cameraMessage}</strong>
-          <span>ONE PERSON · SIDE VIEW · FULL BODY VISIBLE</span>
-          {#if cameraStatus === 'error'}<button class="btn" on:click={() => void startCamera()}>TRY CAMERA AGAIN</button>{/if}
-          <button class="btn" on:click={startGuidedDemo}>VIEW GUIDED DEMO</button>
-          <div class="audio-check">
-            <span>AUDIO FEEDBACK {audioMuted ? 'MUTED' : 'ON'}</span>
-            <button class="btn" on:click={playTestSound}>PLAY TEST SOUND</button>
-            <button class="btn" on:click={toggleMute}>{audioMuted ? 'UNMUTE' : 'MUTE'}</button>
+        {#if showCameraSetup}
+          <div class="camera-copy">
+            <strong>{cameraMessage}</strong>
+            <span>ONE PERSON · SIDE VIEW · FULL BODY VISIBLE</span>
+            {#if cameraStatus === 'error'}<button class="btn" on:click={() => void startCamera()}>TRY CAMERA AGAIN</button>{/if}
+            <button class="btn" on:click={startGuidedDemo}>VIEW GUIDED DEMO</button>
+            <div class="audio-check">
+              <span>AUDIO FEEDBACK {audioMuted ? 'MUTED' : 'ON'}</span>
+              <button class="btn" on:click={playTestSound}>PLAY TEST SOUND</button>
+              <button class="btn" on:click={toggleMute}>{audioMuted ? 'UNMUTE' : 'MUTE'}</button>
+            </div>
           </div>
-        </div>
+        {/if}
       </section>
     {/if}
     <section class="pose-slot" aria-label="Pixel person holding a plank">
@@ -648,7 +651,8 @@
   .canvas-wrap { position:relative; width:min(760px,100%); margin:38px auto 0; }.canvas-meta { display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:4px; }.canvas-meta span { color:var(--muted); font:700 10px var(--mono); }.canvas-meta span.realtime { color:#267a45; }.state-notice { margin:7px 0 10px; color:var(--coral-dark); font:700 10px/1.3 var(--mono); text-align:center; }
   .canvas { display:grid; grid-template-columns:repeat(var(--art-width),1fr); gap:2px; width:min(720px,100%); margin:0 auto; padding:18px; border:0; background:transparent; }.cell { aspect-ratio:1; min-width:0; border:0; border-radius:1px; background:transparent; padding:0; transition:transform .1s ease,filter .1s; }.cell.target { border:1px solid rgba(255,164,127,.68); background:rgba(255,228,210,.48); }.cell.target:not(:disabled):hover,.cell.target:not(:disabled):focus-visible { transform:scale(1.16); filter:brightness(.96); outline:2px solid var(--coral); outline-offset:1px; }.cell.locked { border-color:var(--coral); background:var(--coral); }.cell.pending,.cell.other { border-color:var(--coral); background:var(--coral); animation:pulse 1.25s ease-in-out infinite; box-shadow:0 0 0 4px rgba(255,90,54,.16); }.cell.other { opacity:.65; animation-delay:-.45s; transform:scale(.72); }.cell.empty { pointer-events:none; }
   @keyframes pulse { 50% { transform:scale(1.12); box-shadow:0 0 0 10px rgba(255,90,54,0); } }.controls { display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:18px; }.dev-tools { position:absolute; top:50%; right:-30px; transform:translateY(-50%); display:flex; width:190px; max-height:440px; overflow:auto; flex-direction:column; gap:8px; padding:12px; border:1px dashed var(--coral); border-radius:12px; background:rgba(255,250,245,.97); box-shadow:0 10px 30px rgba(120,61,35,.12); }.dev-tools strong { color:var(--muted); font:700 10px var(--mono); text-align:center; letter-spacing:.08em; }.dev-tools .btn { padding:8px 9px; font-size:9px; }.dev-tools hr { width:100%; margin:2px 0; border:0; border-top:1px dashed var(--line); }.dev-log-status { color:#267a45; font:800 10px/1.2 var(--mono); text-align:center; }.dev-log-detail,.dev-log-error { color:var(--muted); font:700 8px/1.35 var(--mono); text-align:center; }.dev-log-error { color:var(--coral-dark); }
-  @media(max-width:900px){.pose-stage{display:block;min-height:0}.camera-setup{grid-template-columns:1fr;width:min(560px,100%)}.dev-tools{position:static;transform:none;width:min(560px,100%);margin:14px auto 0;flex-direction:row;flex-wrap:wrap;justify-content:center}.dev-tools strong{width:100%}}
+  .camera-setup.camera-runtime-hidden { position:fixed; top:0; left:-10000px; width:2px; height:2px; min-height:0; margin:0; padding:0; overflow:hidden; border:0; opacity:0; pointer-events:none; }
+  @media(max-width:900px){.pose-stage{display:block;min-height:0}.camera-setup{grid-template-columns:1fr;width:min(560px,100%)}.camera-setup.camera-runtime-hidden{width:2px}.dev-tools{position:static;transform:none;width:min(560px,100%);margin:14px auto 0;flex-direction:row;flex-wrap:wrap;justify-content:center}.dev-tools strong{width:100%}}
   @media(max-width:600px){.page{padding:20px 15px 32px}.demo-banner{position:relative;top:0;align-items:flex-start;flex-direction:column}.demo-banner-actions{width:100%;justify-content:flex-end}.status-row{align-items:flex-start}.status-row .mode-selector{gap:5px}.chip{font-size:9px;min-height:32px;padding:8px 9px}.hero{margin-top:44px}.modal-backdrop{padding:15px}.panel{padding:15px}.panel.modal{width:min(620px,calc(100vw - 30px));max-height:calc(100vh - 30px)}.canvas{gap:1px;padding:8px}.grace-cells{gap:8px}.grace-cell{width:24px;height:24px}.privacy-note{font-size:8px}}
   @media(prefers-reduced-motion:reduce){.cell.pending,.cell.other{animation:none;box-shadow:0 0 0 7px rgba(255,90,54,.16)}.body-region-highlight{animation:none}.pose-slot img.celebration-frame{display:none;animation:none}.pose-slot img.celebration-frame:last-child{display:block;opacity:1}}
   .pixel-correction-arrow.sideways { transform:rotate(0deg); }.pixel-correction-arrow.sideways.back { transform:rotate(180deg); }

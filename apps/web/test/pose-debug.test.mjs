@@ -35,20 +35,30 @@ test('pose debug records use canonical keypoints and the pose engine diagnostics
   assert.equal(record.features.hipAngle, 171.2);
   assert.equal(record.quality.occupancy, 0.681);
   assert.deepEqual(record.keypoints.leftShoulder, { x: 100, y: 200.1, score: 0.95 });
-  assert.equal(record.poseRuleConfigVersion, 'movenet-plank-v1');
+  assert.equal(record.poseRuleConfigVersion, 'movenet-plank-v2');
 });
 
 test('visual logger captures state changes immediately and steady state periodically', () => {
   const first = getPoseCaptureDecision({ stage: 'positioning', result, frameTimeMs: 100, minIntervalMs: 2500 });
-  assert.deepEqual(first, { capture: true, reason: 'state-change', signature: 'positioning:FRAMING · HOLD STILL' });
+  assert.equal(first.capture, true);
+  assert.equal(first.reason, 'state-change');
+  assert.equal(first.signature, 'positioning:FRAMING · HOLD STILL');
 
-  const unchanged = getPoseCaptureDecision({ lastSignature: first.signature, lastCaptureAt: 100, stage: 'positioning', result, frameTimeMs: 1200, minIntervalMs: 2500 });
+  const unchanged = getPoseCaptureDecision({ lastSignature: first.signature, lastCaptureAt: 100, candidateSignature: first.signature, candidateSince: 100, stage: 'positioning', result, frameTimeMs: 1200, minIntervalMs: 2500 });
   assert.equal(unchanged.capture, false);
 
   const periodic = getPoseCaptureDecision({ lastSignature: first.signature, lastCaptureAt: 100, stage: 'positioning', result, frameTimeMs: 2600, minIntervalMs: 2500 });
   assert.equal(periodic.reason, 'periodic');
 
   const correction = { ...result, correction: { kind: 'hips-high', label: 'HIPS DOWN' } };
-  const changed = getPoseCaptureDecision({ lastSignature: 'active:GOOD FORM', lastCaptureAt: 2500, stage: 'active', result: correction, frameTimeMs: 2600, minIntervalMs: 2500 });
-  assert.deepEqual(changed, { capture: true, reason: 'state-change', signature: 'active:HIPS TOO HIGH' });
+  const flicker = getPoseCaptureDecision({ lastSignature: 'active:GOOD FORM', lastCaptureAt: 2500, candidateSignature: 'active:GOOD FORM', candidateSince: 2500, stage: 'active', result: correction, frameTimeMs: 2600, minIntervalMs: 2500 });
+  assert.equal(flicker.capture, false);
+  const changed = getPoseCaptureDecision({ lastSignature: 'active:GOOD FORM', lastCaptureAt: 2500, candidateSignature: flicker.candidateSignature, candidateSince: flicker.candidateSince, stage: 'active', result: correction, frameTimeMs: 3000, minIntervalMs: 2500 });
+  assert.equal(changed.capture, true);
+  assert.equal(changed.reason, 'state-change');
+  assert.equal(changed.signature, 'active:HIPS TOO HIGH');
+
+  const workoutStarted = getPoseCaptureDecision({ lastSignature: first.signature, lastCaptureAt: 100, stage: 'countdown', result, frameTimeMs: 150, minIntervalMs: 2500 });
+  assert.equal(workoutStarted.capture, true);
+  assert.equal(workoutStarted.reason, 'state-change');
 });
