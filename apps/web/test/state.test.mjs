@@ -190,6 +190,15 @@ test('guided demo uses isolated state and never changes real progress counters',
   assert.deepEqual(real, snapshot);
 });
 
+test('interactive guided demo waits for the participant to choose a pixel', () => {
+  const real = acknowledgeSafety(createInitialState());
+  const demo = createGuidedDemoState(real, { autoStart: false });
+  assert.equal(demo.demo, true);
+  assert.equal(demo.stage, 'ready');
+  assert.equal(demo.selectedCell, null);
+  assert.equal(demo.dailyCompleted, false);
+});
+
 test('shared snapshots reconcile locked, peer-pending, and owned-pending pixels', () => {
   const source = createInitialState({ stage: 'active', selectedCell: 22 });
   const next = applySharedCanvasSnapshot(source, [

@@ -71,7 +71,7 @@ export function applySharedCanvasSnapshot(state, rows, { ownedCellId = state.sel
   };
 }
 
-export function createGuidedDemoState(source, { target = 8 } = {}) {
+export function createGuidedDemoState(source, { target = 8, autoStart = true } = {}) {
   const cells = source.cells.map((cell) => ({
     ...cell,
     status: cell.status === 'pending' ? 'available' : cell.status,
@@ -101,7 +101,7 @@ export function createGuidedDemoState(source, { target = 8 } = {}) {
     demo: true,
   };
   const available = cells.find((cell) => cell.status === 'available');
-  return available ? startAttempt(base, available.id) : base;
+  return autoStart && available ? startAttempt(base, available.id) : base;
 }
 
 export function chooseMode(state, mode) {
