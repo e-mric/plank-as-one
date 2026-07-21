@@ -28,7 +28,7 @@ P0 BLOCKED: none within the current repository/application asset scope.
 
 P1 PASS:
 
-- `package-lock.json` resolves 154 direct/transitive package entries; all contain license metadata from the families MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, and OFL-1.1.
+- `package-lock.json` resolves 212 direct/transitive package entries; all contain license metadata from the families MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, BlueOak-1.0.0, and OFL-1.1.
 - Direct dependency names, versions, sources, licenses, notices, usage locations, and review status are recorded in `ASSET_LICENSES.md`.
 - Current runtime provenance now covers the `hf-chara.png` source sheet, 21 extracted frames, 21 manual annotation JSON files, sprite manifest, and project-authored favicon/logo.
 
@@ -42,7 +42,7 @@ Residual conditions:
 Evidence reviewed:
 
 - `ASSET_LICENSES.md`, `package-lock.json`, installed package metadata, tracked-file inventory, asset Git history, and current application imports.
-- `npm audit --json` on 2026-07-21: three low-severity findings tracing to `cookie@0.6.0`; no moderate, high, or critical finding.
+- `npm audit --json` on 2026-07-21 after the Vercel adapter upgrade: four low-severity findings; no moderate, high, or critical finding. The upgrade from adapter 5.10.3 to 6.3.4 resolved the moderate `GHSA-9pq4-5hcf-288c` finding detected during deployment.
 - Registry check on 2026-07-21: installed SvelteKit `2.70.1` is the current release; npm's suggested downgrade is not accepted.
 
 Decision: **GO for the current repository/application asset scope.** This is not an overall final-submission GO; deployment, video/media, Session ID, and the remaining Build Week gates are reviewed separately.

@@ -2,6 +2,8 @@
 
 Plank As One turns a short plank into a shared daily ritual: complete one challenge, earn one pixel, and help reveal a collective artwork. The Build Week prototype combines a focused SvelteKit experience with browser-only MoveNet pose estimation, deterministic form rules, safety guidance, audio cues, and a pixel-reservation state machine.
 
+**Live application:** [plank-as-one.vercel.app](https://plank-as-one.vercel.app)
+
 The current shared artwork spells **OPENAI BUILD WEEK**. With Supabase configured, the shared contribution and active-participant counts update from authoritative snapshots and realtime events. The reset countdown is clock-driven, while streak history is stored in the current browser profile.
 
 **Naming:** **Plank As One** is the product. **OPENAI BUILD WEEK** is the limited-edition artwork currently being revealed on its canvas, not a second product name.
@@ -27,12 +29,12 @@ This is general fitness guidance, not medical advice or a guarantee of safe or c
 - A production guided demo uses an interactive six-tip walkthrough and deterministic simulated pose states to teach pixel selection, readiness, countdown, correction, recovery, and completion without requesting camera access or changing real progress.
 - Safety acknowledgement, pixel reservation, countdown, completion, release, daily progression, and one-completion state are represented by a tested local state machine.
 - Successful completion locks the selected pixel for the current browser session and shows a celebration sequence.
-- When Supabase is configured, anonymous identity, atomic reservation/renewal/release/commit functions, five-minute reservation expiry, persistent pixels, collision handling, and realtime multi-browser reconciliation replace the local canvas mock. The interface visibly reports `SHARED CANVAS LIVE`.
+- In the deployed build, anonymous identity, atomic reservation/renewal/release/commit functions, five-minute reservation expiry, persistent pixels, collision handling, and realtime multi-browser reconciliation replace the local canvas mock.
 
 ## Prototype limitations
 
 - Without the two public Supabase environment variables, the canvas runs locally. Browser streak history persists across refreshes in that browser profile but does not synchronize across devices.
-- The repository includes the shared-canvas backend migration and client integration, but a deployment cannot claim `SHARED LIVE` until a Supabase project is provisioned and the two-browser verification in `supabase/README.md` passes.
+- The Vercel production deployment uses the provisioned Supabase canvas. An automated two-client test verifies atomic collision handling, realtime reservation visibility, and release; a final visual check in two browser profiles is still recommended before submission.
 - Streak and progressive target duration remain local prototype values even when the canvas itself is shared. There is no archive or Leader workflow yet.
 - The production guided demo is intentionally simulated and does not validate a participant's real pose.
 - Pose thresholds have deterministic unit coverage but have not completed broad calibration across people, devices, camera positions, clothing, and lighting conditions.
@@ -98,6 +100,7 @@ The optional shared mode uses owner-free public canvas rows plus private reserva
 npm test          # State-machine and pose-engine unit tests
 npm run check     # Svelte and TypeScript diagnostics
 npm run build     # Production build
+npm run verify:shared # Two-client Supabase reservation/realtime/release smoke test
 npm run preview   # Preview the production build locally
 ```
 
@@ -158,4 +161,4 @@ Original project source code and documentation are available under the [MIT Lice
 
 ## Submission status
 
-The repository contains a runnable local prototype, an optional persistent/realtime canvas implementation, an MIT software license, and an approved dependency/asset ledger for the current repository and application scope. A Supabase-backed public judging deployment with two-browser evidence, public YouTube demonstration and final-media review, and verified `/feedback` Session ID are still required before final submission.
+The Supabase-backed application is deployed publicly on Vercel, and its atomic reservation, collision, realtime, and release behavior passes the automated two-client production smoke test. Before final submission, the team still needs to complete a visual cross-browser journey check, publish and review the YouTube demonstration, record the `/feedback` Session ID, create a clean release commit, and close the remaining entrant-owned Build Week gates.
