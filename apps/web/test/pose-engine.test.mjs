@@ -7,6 +7,7 @@ import { createStableSideSelector } from '../src/lib/pose/side-selector.js';
 import { createPoseAnalyzer } from '../src/lib/pose/engine.js';
 import { extractFeatures } from '../src/lib/pose/features.js';
 import { describeFraming } from '../src/lib/pose/setup-machine.js';
+import { createRuleEvaluator } from '../src/lib/pose/rules.js';
 
 const keypoints = (hipY = 0.4, confidence = 0.95) => [
   ['left_shoulder', 0.3, 0.4], ['left_elbow', 0.3, 0.5], ['left_wrist', 0.4, 0.5],
@@ -96,7 +97,27 @@ test('analyzer distinguishes stable readiness, tracking loss, and hip correction
   correctionAnalyzer.analyze(pose(), { width: 1000, height: 1000, now: 100 });
   const lowAtStart = correctionAnalyzer.analyze(pose(0.58), { width: 1000, height: 1000, now: 200 });
   assert.equal(lowAtStart.correction, null);
-  const lowConfirmed = correctionAnalyzer.analyze(pose(0.58), { width: 1000, height: 1000, now: 450 });
+  const lowConfirmed = correctionAnalyzer.analyze(pose(0.58), { width: 1000, height: 1000, now: 600 });
   assert.equal(lowConfirmed.form, 'hips-low');
   assert.equal(lowConfirmed.correction.label, 'HIPS UP');
+});
+
+test('plank rules tolerate normal pose and camera variance but retain clear corrections', () => {
+  const evaluator = createRuleEvaluator();
+  const nearIdeal = {
+    hipOffset: 0.12,
+    shoulderStack: 0.22,
+    elbowAngle: 60,
+    kneeAngle: 145,
+    neckAngle: 140,
+  };
+
+  assert.deepEqual(evaluator.evaluate(nearIdeal, 0), []);
+  assert.deepEqual(evaluator.evaluate(nearIdeal, 1000), []);
+
+  const clearlyLowHips = { ...nearIdeal, hipOffset: 0.24 };
+  assert.deepEqual(evaluator.evaluate(clearlyLowHips, 1100), []);
+  const confirmed = evaluator.evaluate(clearlyLowHips, 1500);
+  assert.equal(confirmed.some((error) => error.name === 'hipOffset'), true);
+  assert.equal(confirmed.find((error) => error.name === 'hipOffset').correction.kind, 'hips-low');
 });

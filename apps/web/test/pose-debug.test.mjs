@@ -35,7 +35,7 @@ test('pose debug records use canonical keypoints and the pose engine diagnostics
   assert.equal(record.features.hipAngle, 171.2);
   assert.equal(record.quality.occupancy, 0.681);
   assert.deepEqual(record.keypoints.leftShoulder, { x: 100, y: 200.1, score: 0.95 });
-  assert.equal(record.poseRuleConfigVersion, 'movenet-plank-v2');
+  assert.equal(record.poseRuleConfigVersion, 'movenet-plank-v3');
 });
 
 test('visual logger captures state changes immediately and steady state periodically', () => {
