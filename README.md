@@ -26,7 +26,7 @@ This is general fitness guidance, not medical advice or a guarantee of safe or c
 - Temporal smoothing, hysteresis, correction prioritization, and grace timing reduce rapid feedback changes.
 - Visual and audio cues communicate corrections without requiring continuous screen attention.
 - Honor mode provides a camera-free completion path that is explicitly not camera-validated.
-- A production guided demo uses an interactive six-tip walkthrough and deterministic simulated pose states to teach pixel selection, readiness, countdown, correction, recovery, and completion without requesting camera access or changing real progress.
+- A production guided demo uses an interactive eight-tip walkthrough and deterministic simulated pose states to teach pixel selection, readiness, countdown, low- and high-hip corrections, tracking loss, recovery, and completion without requesting camera access or changing real progress.
 - Safety acknowledgement, pixel reservation, countdown, completion, release, daily progression, and one-completion state are represented by a tested local state machine.
 - Successful completion locks the selected pixel for the current browser session and shows a celebration sequence.
 - In the deployed build, anonymous identity, atomic reservation/renewal/release/commit functions, five-minute reservation expiry, persistent pixels, collision handling, and realtime multi-browser reconciliation replace the local canvas mock.

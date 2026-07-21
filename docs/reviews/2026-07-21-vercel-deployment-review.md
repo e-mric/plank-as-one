@@ -54,3 +54,7 @@ Required actions, owner, deadline:
 Decision: **GO for the public deployment and automated shared-canvas behavior, conditional on the manual visual cross-browser check.** This is not an overall final-submission GO; the video, Session ID, release commit, and entrant-owned gates remain separate.
 
 Representative approval: pending final release approval.
+
+## Post-review release status
+
+The application changes through `e335331` are committed on `main`, including the more permissive `movenet-plank-v3` thresholds and the extended eight-tip guided demo. These post-review changes still require a fresh production deployment and visual verification before the deployed URL can be claimed to match the release candidate.
