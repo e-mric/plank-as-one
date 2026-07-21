@@ -134,11 +134,11 @@
       : (state.stage === 'active' || state.stage === 'complete') && (state.form === 'valid' || (state.form === 'tracking' && !trackingVisible))
         ? { kind: 'perfect', frameId: 'forearm-plank-01', alt: 'Pixel-art athlete holding a forearm plank' }
     : state.form === 'hips-low' && (state.stage === 'grace' || state.stage === 'paused')
-      ? { kind: 'hips-low', frameId: 'lowering-02', alt: 'Pixel-art athlete with low plank form' }
+      ? { kind: 'hips-low', frameId: 'forearm-plank-knees-02', alt: 'Pixel-art athlete planking with hips too low' }
     : state.form === 'hips-high' && (state.stage === 'grace' || state.stage === 'paused')
       ? { kind: 'hips-high', frameId: 'forearm-plank-high', alt: 'Pixel-art athlete planking with hips too high' }
     : state.stage === 'grace' || state.stage === 'paused' || state.form !== 'valid'
-      ? { kind: 'bad', frameId: 'forearm-plank-knees-02', alt: 'Pixel-art athlete resting on their knees' }
+      ? { kind: 'bad', frameId: 'lowering-02', alt: 'Pixel-art athlete with incorrect plank form' }
       : { kind: 'ready', frameId: 'kneel-02', alt: 'Pixel-art athlete getting into position' };
   $: pose = fallbackPose.kind === 'celebrate' || fallbackPose.kind === 'exhausted' || !matchedSpriteFrameId
     ? fallbackPose

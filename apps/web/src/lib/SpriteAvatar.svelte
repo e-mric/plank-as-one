@@ -1,6 +1,6 @@
 <script lang="ts">
   export let atlas: { src: string; width: number; height: number; viewport?: number };
-  export let frame: { id: string; bounds: { x: number; y: number; width: number; height: number } };
+  export let frame: { id: string; src?: string; bounds: { x: number; y: number; width: number; height: number } };
   export let alt = '';
   export let decorative = false;
 
@@ -17,19 +17,24 @@
   aria-hidden={decorative ? 'true' : undefined}
   data-sprite-state={frame.id}
 >
-  <svg
-    x={frameX}
-    y={frameY}
-    width={frame.bounds.width}
-    height={frame.bounds.height}
-    viewBox={`${frame.bounds.x} ${frame.bounds.y} ${frame.bounds.width} ${frame.bounds.height}`}
-    overflow="hidden"
-  >
-    <image href={atlas.src} width={atlas.width} height={atlas.height} />
-  </svg>
+  {#if frame.src}
+    <image href={frame.src} width={viewport} height={viewport} />
+  {:else}
+    <svg
+      x={frameX}
+      y={frameY}
+      width={frame.bounds.width}
+      height={frame.bounds.height}
+      viewBox={`${frame.bounds.x} ${frame.bounds.y} ${frame.bounds.width} ${frame.bounds.height}`}
+      overflow="hidden"
+    >
+      <image class="atlas-source" href={atlas.src} width={atlas.width} height={atlas.height} />
+    </svg>
+  {/if}
 </svg>
 
 <style>
-  .sprite-avatar { display:block; width:100%; height:100%; overflow:visible; mix-blend-mode:multiply; image-rendering:pixelated; }
+  .sprite-avatar { display:block; width:100%; height:100%; overflow:visible; image-rendering:pixelated; }
   image { image-rendering:pixelated; }
+  .atlas-source { mix-blend-mode:multiply; }
 </style>

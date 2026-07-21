@@ -1,6 +1,14 @@
 # Sprite-state avatars
 
-The workout avatar is rendered from the unchanged `hf-chara.png` atlas. Frame bounds and reference keypoints live in `apps/web/src/lib/pose/sprite-states.json`; the app does not crop or regenerate the source artwork.
+The unchanged `hf-chara.png` atlas is the source of truth for annotation. The workout avatar renders the 21 aligned, transparent PNGs in `apps/web/static/poses/hf-chara/`; frame bounds, asset paths, and reference keypoints live in `apps/web/src/lib/pose/sprite-states.json`.
+
+To regenerate every transparent frame from the atlas, run:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\split-sprite-atlas.ps1
+```
+
+The exporter removes white matte regions connected to a crop boundary, clears substantial enclosed background gaps between limbs, and preserves the original sprite pixels. Every output is bottom-centred on the same 480×480 transparent canvas so frame changes do not shift the avatar anchor.
 
 ## Annotate the atlas
 
