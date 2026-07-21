@@ -1,0 +1,77 @@
+{
+  "image": {
+    "name": "squat-02.png",
+    "width": 480,
+    "height": 480
+  },
+  "points": {
+    "nose": [
+      301,
+      177
+    ],
+    "left_eye": [
+      310,
+      163
+    ],
+    "right_eye": [
+      288,
+      163
+    ],
+    "left_ear": [
+      303,
+      159
+    ],
+    "right_ear": [
+      259,
+      158
+    ],
+    "left_shoulder": [
+      291,
+      220
+    ],
+    "right_shoulder": [
+      205,
+      199
+    ],
+    "left_elbow": [
+      288,
+      277
+    ],
+    "right_elbow": [
+      186,
+      268
+    ],
+    "left_wrist": [
+      313,
+      316
+    ],
+    "right_wrist": [
+      210,
+      311
+    ],
+    "left_hip": [
+      226,
+      294
+    ],
+    "right_hip": [
+      164,
+      286
+    ],
+    "left_knee": [
+      286,
+      358
+    ],
+    "right_knee": [
+      214,
+      374
+    ],
+    "left_ankle": [
+      246,
+      428
+    ],
+    "right_ankle": [
+      164,
+      434
+    ]
+  }
+}

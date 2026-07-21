@@ -1,0 +1,77 @@
+{
+  "image": {
+    "name": "stand-01.png",
+    "width": 480,
+    "height": 480
+  },
+  "points": {
+    "nose": [
+      267,
+      100
+    ],
+    "left_eye": [
+      271,
+      86
+    ],
+    "right_eye": [
+      248,
+      86
+    ],
+    "left_ear": [
+      266,
+      85
+    ],
+    "right_ear": [
+      218,
+      87
+    ],
+    "left_shoulder": [
+      288,
+      148
+    ],
+    "right_shoulder": [
+      190,
+      144
+    ],
+    "left_elbow": [
+      291,
+      214
+    ],
+    "right_elbow": [
+      171,
+      208
+    ],
+    "left_wrist": [
+      304,
+      261
+    ],
+    "right_wrist": [
+      175,
+      265
+    ],
+    "left_hip": [
+      273,
+      252
+    ],
+    "right_hip": [
+      211,
+      252
+    ],
+    "left_knee": [
+      278,
+      363
+    ],
+    "right_knee": [
+      206,
+      370
+    ],
+    "left_ankle": [
+      272,
+      435
+    ],
+    "right_ankle": [
+      191,
+      440
+    ]
+  }
+}

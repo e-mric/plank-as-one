@@ -1,0 +1,77 @@
+{
+  "image": {
+    "name": "forearm-plank-knees-02.png",
+    "width": 480,
+    "height": 480
+  },
+  "points": {
+    "nose": [
+      404,
+      395
+    ],
+    "left_eye": [
+      396,
+      374
+    ],
+    "right_eye": [
+      392,
+      376
+    ],
+    "left_ear": [
+      369,
+      362
+    ],
+    "right_ear": [
+      365,
+      364
+    ],
+    "left_shoulder": [
+      348,
+      364
+    ],
+    "right_shoulder": [
+      319,
+      380
+    ],
+    "left_elbow": [
+      332,
+      440
+    ],
+    "right_elbow": [
+      308,
+      453
+    ],
+    "left_wrist": [
+      359,
+      441
+    ],
+    "right_wrist": [
+      352,
+      454
+    ],
+    "left_hip": [
+      231,
+      400
+    ],
+    "right_hip": [
+      231,
+      405
+    ],
+    "left_knee": [
+      160,
+      443
+    ],
+    "right_knee": [
+      151,
+      462
+    ],
+    "left_ankle": [
+      81,
+      415
+    ],
+    "right_ankle": [
+      64,
+      421
+    ]
+  }
+}

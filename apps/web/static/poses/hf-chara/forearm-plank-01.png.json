@@ -1,0 +1,77 @@
+{
+  "image": {
+    "name": "forearm-plank-01.png",
+    "width": 480,
+    "height": 480
+  },
+  "points": {
+    "nose": [
+      429,
+      368
+    ],
+    "left_eye": [
+      419,
+      352
+    ],
+    "right_eye": [
+      415,
+      351
+    ],
+    "left_ear": [
+      392,
+      343
+    ],
+    "right_ear": [
+      386,
+      343
+    ],
+    "left_shoulder": [
+      366,
+      367
+    ],
+    "right_shoulder": [
+      338,
+      366
+    ],
+    "left_elbow": [
+      366,
+      444
+    ],
+    "right_elbow": [
+      338,
+      451
+    ],
+    "left_wrist": [
+      393,
+      445
+    ],
+    "right_wrist": [
+      387,
+      451
+    ],
+    "left_hip": [
+      239,
+      384
+    ],
+    "right_hip": [
+      232,
+      384
+    ],
+    "left_knee": [
+      153,
+      403
+    ],
+    "right_knee": [
+      145,
+      406
+    ],
+    "left_ankle": [
+      63,
+      412
+    ],
+    "right_ankle": [
+      42,
+      418
+    ]
+  }
+}

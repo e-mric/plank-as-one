@@ -1,0 +1,77 @@
+{
+  "image": {
+    "name": "high-plank-01.png",
+    "width": 480,
+    "height": 480
+  },
+  "points": {
+    "nose": [
+      388,
+      327
+    ],
+    "left_eye": [
+      391,
+      307
+    ],
+    "right_eye": [
+      385,
+      306
+    ],
+    "left_ear": [
+      362,
+      287
+    ],
+    "right_ear": [
+      357,
+      289
+    ],
+    "left_shoulder": [
+      330,
+      295
+    ],
+    "right_shoulder": [
+      292,
+      304
+    ],
+    "left_elbow": [
+      331,
+      375
+    ],
+    "right_elbow": [
+      282,
+      376
+    ],
+    "left_wrist": [
+      338,
+      423
+    ],
+    "right_wrist": [
+      287,
+      432
+    ],
+    "left_hip": [
+      209,
+      298
+    ],
+    "right_hip": [
+      201,
+      306
+    ],
+    "left_knee": [
+      177,
+      392
+    ],
+    "right_knee": [
+      153,
+      385
+    ],
+    "left_ankle": [
+      96,
+      420
+    ],
+    "right_ankle": [
+      71,
+      421
+    ]
+  }
+}

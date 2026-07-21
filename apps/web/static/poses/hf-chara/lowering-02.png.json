@@ -1,0 +1,77 @@
+{
+  "image": {
+    "name": "lowering-02.png",
+    "width": 480,
+    "height": 480
+  },
+  "points": {
+    "nose": [
+      401,
+      364
+    ],
+    "left_eye": [
+      392,
+      343
+    ],
+    "right_eye": [
+      388,
+      345
+    ],
+    "left_ear": [
+      364,
+      334
+    ],
+    "right_ear": [
+      359,
+      334
+    ],
+    "left_shoulder": [
+      350,
+      354
+    ],
+    "right_shoulder": [
+      302,
+      371
+    ],
+    "left_elbow": [
+      357,
+      441
+    ],
+    "right_elbow": [
+      299,
+      452
+    ],
+    "left_wrist": [
+      389,
+      442
+    ],
+    "right_wrist": [
+      348,
+      452
+    ],
+    "left_hip": [
+      230,
+      359
+    ],
+    "right_hip": [
+      223,
+      367
+    ],
+    "left_knee": [
+      152,
+      402
+    ],
+    "right_knee": [
+      146,
+      410
+    ],
+    "left_ankle": [
+      92,
+      409
+    ],
+    "right_ankle": [
+      74,
+      416
+    ]
+  }
+}

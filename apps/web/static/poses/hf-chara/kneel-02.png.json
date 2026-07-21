@@ -1,0 +1,77 @@
+{
+  "image": {
+    "name": "kneel-02.png",
+    "width": 480,
+    "height": 480
+  },
+  "points": {
+    "nose": [
+      345,
+      304
+    ],
+    "left_eye": [
+      341,
+      283
+    ],
+    "right_eye": [
+      335,
+      285
+    ],
+    "left_ear": [
+      316,
+      275
+    ],
+    "right_ear": [
+      312,
+      278
+    ],
+    "left_shoulder": [
+      296,
+      295
+    ],
+    "right_shoulder": [
+      275,
+      314
+    ],
+    "left_elbow": [
+      298,
+      383
+    ],
+    "right_elbow": [
+      275,
+      379
+    ],
+    "left_wrist": [
+      300,
+      441
+    ],
+    "right_wrist": [
+      282,
+      440
+    ],
+    "left_hip": [
+      218,
+      346
+    ],
+    "right_hip": [
+      193,
+      354
+    ],
+    "left_knee": [
+      287,
+      374
+    ],
+    "right_knee": [
+      224,
+      455
+    ],
+    "left_ankle": [
+      238,
+      435
+    ],
+    "right_ankle": [
+      137,
+      423
+    ]
+  }
+}

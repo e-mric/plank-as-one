@@ -1,0 +1,77 @@
+{
+  "image": {
+    "name": "quadruped-01.png",
+    "width": 480,
+    "height": 480
+  },
+  "points": {
+    "nose": [
+      388,
+      319
+    ],
+    "left_eye": [
+      380,
+      297
+    ],
+    "right_eye": [
+      376,
+      299
+    ],
+    "left_ear": [
+      353,
+      286
+    ],
+    "right_ear": [
+      349,
+      289
+    ],
+    "left_shoulder": [
+      335,
+      304
+    ],
+    "right_shoulder": [
+      291,
+      310
+    ],
+    "left_elbow": [
+      340,
+      378
+    ],
+    "right_elbow": [
+      277,
+      374
+    ],
+    "left_wrist": [
+      350,
+      429
+    ],
+    "right_wrist": [
+      282,
+      431
+    ],
+    "left_hip": [
+      219,
+      334
+    ],
+    "right_hip": [
+      200,
+      333
+    ],
+    "left_knee": [
+      222,
+      442
+    ],
+    "right_knee": [
+      175,
+      452
+    ],
+    "left_ankle": [
+      128,
+      408
+    ],
+    "right_ankle": [
+      86,
+      414
+    ]
+  }
+}

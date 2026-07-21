@@ -1,0 +1,77 @@
+{
+  "image": {
+    "name": "celebrate-02.png",
+    "width": 480,
+    "height": 480
+  },
+  "points": {
+    "nose": [
+      258,
+      174
+    ],
+    "left_eye": [
+      262,
+      166
+    ],
+    "right_eye": [
+      237,
+      167
+    ],
+    "left_ear": [
+      267,
+      169
+    ],
+    "right_ear": [
+      215,
+      178
+    ],
+    "left_shoulder": [
+      286,
+      226
+    ],
+    "right_shoulder": [
+      192,
+      226
+    ],
+    "left_elbow": [
+      324,
+      280
+    ],
+    "right_elbow": [
+      157,
+      278
+    ],
+    "left_wrist": [
+      335,
+      236
+    ],
+    "right_wrist": [
+      145,
+      237
+    ],
+    "left_hip": [
+      277,
+      334
+    ],
+    "right_hip": [
+      218,
+      333
+    ],
+    "left_knee": [
+      293,
+      457
+    ],
+    "right_knee": [
+      203,
+      465
+    ],
+    "left_ankle": [
+      228,
+      415
+    ],
+    "right_ankle": [
+      170,
+      414
+    ]
+  }
+}
