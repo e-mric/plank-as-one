@@ -1,6 +1,6 @@
 # Dependency and Asset License Ledger
 
-Review date: 2026-07-21
+Review date: 2026-07-22
 
 Technical inventory reviewer: Codex
 
@@ -38,8 +38,11 @@ Versions below are resolved by `package-lock.json`, not inferred from `latest` d
 | Vite | 6.4.3 | [Vite](https://github.com/vitejs/vite) contributors | MIT | Preserve upstream copyright and license notice | Build tooling | PASS |
 | TypeScript | 5.9.3 | [TypeScript](https://github.com/microsoft/TypeScript) / Microsoft | Apache-2.0 | Preserve upstream copyright and license notices | Development verification | PASS |
 | Supabase JavaScript client | 2.110.7 | [Supabase](https://github.com/supabase/supabase-js) contributors | MIT | Preserve upstream copyright and license notice | Anonymous auth, database RPC, snapshots, and realtime canvas updates | PASS |
+| Playwright | 1.61.1 | [Microsoft Playwright](https://github.com/microsoft/playwright) contributors | Apache-2.0 | Preserve upstream copyright and license notices when redistributing | Build Week guided-demo video capture tooling only; not shipped in the web application | PASS |
 
 The lockfile currently contains 212 transitive and direct package entries. Every entry includes license metadata. Recorded license families are MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, BlueOak-1.0.0, and OFL-1.1. `package-lock.json` is the version inventory; licenses shipped in the installed package distributions remain authoritative.
+
+The separate `video-demo/package-lock.json` resolves Playwright 1.61.1, Playwright Core 1.61.1, and optional `fsevents` 2.3.2. Their recorded licenses are Apache-2.0 and MIT. These packages are used only to produce submission media and are excluded from the participant-facing bundle.
 
 `npm audit` on 2026-07-21 reports four low-severity findings and no moderate, high, or critical findings. The Vercel adapter was upgraded from 5.10.3 to 6.3.4 to resolve the moderate `GHSA-9pq4-5hcf-288c` advisory discovered during deployment. The remaining low-severity SvelteKit cookie advisory is not addressed by npm's proposed unsupported major downgrade; this application does not construct cookie names, paths, or domains from participant input. Recheck for upstream patches before the final release commit.
 
@@ -103,6 +106,12 @@ Review performed from the checked-in PNGs on 2026-07-21. This is a practical sub
 The current application does not ship music or recorded speech. Correction tones are synthesized at runtime with the Web Audio API, and spoken prompts use the participant's browser speech-synthesis voice. No audio recording is stored in the repository.
 
 Status: **PASS for the current application**, subject to ensuring the demo video does not add unlicensed music, recordings, or sound effects.
+
+## Demo narration audio
+
+| Asset | Source | Technical preparation | Required action | Status |
+| --- | --- | --- | --- | --- |
+| `video-demo/input/narration-final.mp3` | Clean Eleven v3 speech generated through Higgsfield and supplied by the project team on 2026-07-22; no music is present and the superseded bracket-reading take is not used | The clean take is used at its original tempo; final assembly normalizes speech to approximately -16 LUFS | Record the exact voice/preset, confirm that it was not an unauthorized cloned voice, and listen to/approve the canonical MP4 before publication | CONDITIONAL |
 
 ## Entrant approval and continuing conditions
 

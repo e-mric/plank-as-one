@@ -1,0 +1,15 @@
+{
+  "name": "plank-as-one-video-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare:narration": "node scripts/prepare-narration.mjs",
+    "capture": "node scripts/capture-guided-demo.mjs",
+    "conform": "node scripts/conform-capture.mjs",
+    "assemble": "node scripts/assemble-video.mjs",
+    "qa": "node scripts/qa-video.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.61.1"
+  }
+}

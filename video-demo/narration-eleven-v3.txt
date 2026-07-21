@@ -1,0 +1,29 @@
+VOICE DIRECTION — DO NOT READ ALOUD
+Warm, confident, and energetic without sounding like an advertisement. Natural international English. Medium pace, approximately 135 words per minute. Make technical phrases clear. Respect the pauses and emotional tags, but do not exaggerate them. No background music.
+
+--- SCRIPT ---
+
+[warm, inviting]
+Meet Plank As One, an Apps for Your Life project that turns one short daily plank into one pixel of a shared artwork.
+
+Working out alone can feel isolating, and beginners may struggle to judge their form. Plank As One is for people who want simple structure, immediate guidance, and a visible sense that their effort joins something larger.
+
+[confident]
+This guided demo uses isolated, simulated pose states, so it never changes real progress. I choose an available pixel first. In a real camera session, the browser checks that one full body is visible from the side and stable before starting the countdown.
+
+Once the hold begins, time is credited only while detected form is valid. Low hips produce a HIPS UP cue. High hips reverse it to HIPS DOWN. If the participant leaves the frame, tracking pauses instead of guessing. Returning to valid form resumes the timer, and completion locks the chosen pixel.
+
+[clear, technical]
+The camera pipeline runs on the participant’s device. TensorFlow dot J S MoveNet estimates landmarks in the browser. A versioned rule engine adds confidence gates, smoothing, hysteresis, correction priority, and grace timing. The application does not upload camera frames or pose calculations.
+
+Supabase provides anonymous identity, atomic reservation, collision handling, release, completion, and realtime canvas updates. Two people cannot earn the same pixel, while everyone can watch the artwork emerge.
+
+[thoughtful]
+Codex with GPT five point six was our engineering collaborator throughout Build Week. It helped shape the state machine and privacy architecture, implement the SvelteKit and MoveNet experience, create pose-debug evidence, integrate Supabase and Vercel, and build focused tests. We used Codex to review failures and iterate, not to replace product judgment.
+
+Human decisions remained central: the pixel-first journey, camera-free mode, on-device processing, conservative safety language, five-second correction grace period, and clearly labelled simulation.
+
+[hopeful, concise]
+Most fitness apps record private numbers. Plank As One makes a small effort visibly collective, combining habit support, privacy-conscious feedback, and asynchronous community art in one ritual.
+
+One plank. One pixel. One canvas. Plank As One.

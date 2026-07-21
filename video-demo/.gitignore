@@ -1,0 +1,10 @@
+node_modules/
+input/*
+work/*
+dist/*
+qa/*
+
+!input/.gitkeep
+!work/.gitkeep
+!dist/.gitkeep
+!qa/.gitkeep
