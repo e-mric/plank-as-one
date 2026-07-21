@@ -8,6 +8,7 @@
   import { startPoseInference } from '$lib/pose/frame-scheduler.js';
   import { CAMERA_CONSTRAINTS, describeFraming, getCameraErrorMessage } from '$lib/pose/setup-machine.js';
   import { createAudioFeedback } from '$lib/pose/audio-feedback.js';
+  import { isPoseDevToolsEnabled } from '$lib/pose/dev-tools-config.js';
   import { analyzePoseFrame, resetPoseAnalyzer } from '$lib/pose/engine.js';
   import { createSpriteStateMatcher } from '$lib/pose/sprite-matcher.js';
   import { loadSpriteAnnotations } from '$lib/pose/sprite-annotations.js';
@@ -20,6 +21,10 @@
   type DemoTipId = 'welcome' | 'positioning' | 'countdown' | 'active' | 'correction' | 'recovery' | 'complete';
 
   const spriteManifest: any = spriteStateData;
+  const poseDevToolsEnabled = isPoseDevToolsEnabled({
+    development: dev,
+    configuredValue: env.PUBLIC_ENABLE_POSE_DEV_TOOLS,
+  });
   const spriteFramesById: Map<string, any> = new Map<string, any>(spriteManifest.frames.map((frame: any) => [frame.id, frame]));
   let spriteMatcher = createSpriteStateMatcher(spriteManifest);
   const CELEBRATION_FRAME_SECONDS = 0.16;
@@ -161,7 +166,7 @@
     if (!guidedDemo && previous.stage !== state.stage && state.stage === 'positioning') void startCamera();
     if (previous.mode === 'camera' && activeStage(previous.stage) && !activeStage(state.stage)) {
       stopCamera();
-      if (dev && poseDebugSession?.active) void stopPoseDebugLogging(state.stage === 'complete' ? 'workout-complete' : 'session-ended');
+      if (poseDevToolsEnabled && poseDebugSession?.active) void stopPoseDebugLogging(state.stage === 'complete' ? 'workout-complete' : 'session-ended');
     }
     if (state.stage === 'complete' && previous.stage !== 'complete') {
       stopCamera();
@@ -214,7 +219,7 @@
   }
 
   async function ensurePoseDebugSession() {
-    if (!dev) return null;
+    if (!poseDevToolsEnabled) return null;
     if (!poseDebugSession) {
       const { createPoseDebugSession } = await import('$lib/pose/debug-session.js');
       poseDebugSession = createPoseDebugSession({
@@ -373,14 +378,14 @@
         onError: () => {
           cameraStatus = 'error';
           cameraMessage = 'POSE TRACKING UNAVAILABLE';
-          if (dev && poseDebugSession?.active) void stopPoseDebugLogging('inference-error');
+          if (poseDevToolsEnabled && poseDebugSession?.active) void stopPoseDebugLogging('inference-error');
         },
       });
       cameraStatus = 'ready';
     } catch (error) {
       cameraStatus = 'error';
       cameraMessage = getCameraErrorMessage(error);
-      if (dev && poseDebugSession?.active) void stopPoseDebugLogging('camera-error');
+      if (poseDevToolsEnabled && poseDebugSession?.active) void stopPoseDebugLogging('camera-error');
       stopCamera(false);
     } finally {
       cameraStarting = false;
@@ -394,7 +399,7 @@
       height: inferenceVideo.videoHeight || 1,
       now,
     });
-    if (dev && poseDebugSession?.active) {
+    if (poseDevToolsEnabled && poseDebugSession?.active) {
       void poseDebugSession.observe({
         video: inferenceVideo,
         pose: poseResult,
@@ -463,7 +468,11 @@
     void initializeAudio().then(() => audio.test());
   }
   function chooseMode(mode: string) { dispatch({ type: 'choose-mode', mode }); }
+  function runPoseDevAction(action: Action) {
+    if (poseDevToolsEnabled) dispatch(action);
+  }
   function skipToCelebration() {
+    if (!poseDevToolsEnabled) return;
     let next = state;
     if (next.stage === 'positioning') next = reduce(next, { type: 'confirm-ready-position' });
     if (next.stage === 'countdown') next = reduce(next, { type: 'tick', ms: 3000 });
@@ -511,7 +520,7 @@
   function launchGuidedDemo(withAudio: boolean) {
     const source = guidedDemo && demoReturnState ? demoReturnState : state;
     if (!guidedDemo) demoReturnState = state;
-    if (dev && poseDebugSession?.active) void stopPoseDebugLogging('guided-demo-started');
+    if (poseDevToolsEnabled && poseDebugSession?.active) void stopPoseDebugLogging('guided-demo-started');
     stopCamera();
     if (withAudio) void initializeAudio();
     demoResetLabel = liveResetLabel;
@@ -559,7 +568,7 @@
     syncLocalStreak();
     liveResetLabel = formatResetCountdown();
     resetInterval = setInterval(() => { liveResetLabel = formatResetCountdown(); }, 1000);
-    if (dev) void ensurePoseDebugSession().catch((error: any) => {
+    if (poseDevToolsEnabled) void ensurePoseDebugSession().catch((error: any) => {
       poseDebugStatus = { ...poseDebugStatus, error: error?.message || 'Visual logger failed to load' };
     });
     const sharedConfig = getSharedCanvasConfig(env);
@@ -604,7 +613,7 @@
       }, 120);
     }
     if (new URL(window.location.href).searchParams.get('demo') === '1') launchGuidedDemo(false);
-    return () => { clearInterval(interval); clearInterval(heartbeatInterval); clearInterval(resetInterval); clearInterval(logoFillInterval); document.removeEventListener('visibilitychange', abandonHonor); if (dev && poseDebugSession?.active) void poseDebugSession.stop('page-unload'); stopCamera(); audio.dispose(); void sharedService?.disconnect(); };
+    return () => { clearInterval(interval); clearInterval(heartbeatInterval); clearInterval(resetInterval); clearInterval(logoFillInterval); document.removeEventListener('visibilitychange', abandonHonor); if (poseDevToolsEnabled && poseDebugSession?.active) void poseDebugSession.stop('page-unload'); stopCamera(); audio.dispose(); void sharedService?.disconnect(); };
   });
 </script>
 
@@ -740,7 +749,7 @@
         </div>
       {/if}
     </section>
-    {#if dev && !guidedDemo && active && state.mode === 'camera' && state.stage !== 'countdown'}
+    {#if poseDevToolsEnabled && !guidedDemo && active && state.mode === 'camera' && state.stage !== 'countdown'}
       <aside class="dev-tools" aria-label="Developer form testing controls">
         <strong>POSE VISUAL LOG</strong>
         {#if poseDebugStatus.active}
@@ -756,12 +765,12 @@
         <hr />
         <strong>STATE SIMULATOR</strong>
         {#if state.stage === 'positioning'}
-          <button class="btn" on:click={() => dispatch({ type: 'confirm-ready-position' })}>READY POSITION</button>
+          <button class="btn" on:click={() => runPoseDevAction({ type: 'confirm-ready-position' })}>READY POSITION</button>
         {:else}
-          <button class="btn" on:click={() => dispatch({ type: 'set-form', form: 'valid' })}>VALID FORM</button>
-          <button class="btn" on:click={() => dispatch({ type: 'set-form', form: 'hips-low' })}>HIPS TOO LOW</button>
-          <button class="btn" on:click={() => dispatch({ type: 'set-form', form: 'hips-high' })}>HIPS TOO HIGH</button>
-          <button class="btn" on:click={() => dispatch({ type: 'set-form', form: 'tracking' })}>MOVE OUT OF FRAME</button>
+          <button class="btn" on:click={() => runPoseDevAction({ type: 'set-form', form: 'valid' })}>VALID FORM</button>
+          <button class="btn" on:click={() => runPoseDevAction({ type: 'set-form', form: 'hips-low' })}>HIPS TOO LOW</button>
+          <button class="btn" on:click={() => runPoseDevAction({ type: 'set-form', form: 'hips-high' })}>HIPS TOO HIGH</button>
+          <button class="btn" on:click={() => runPoseDevAction({ type: 'set-form', form: 'tracking' })}>MOVE OUT OF FRAME</button>
         {/if}
         <button class="btn" on:click={skipToCelebration}>SKIP TO CELEBRATION</button>
       </aside>

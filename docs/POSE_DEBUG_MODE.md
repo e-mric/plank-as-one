@@ -1,16 +1,17 @@
 # Pose estimation visual logging
 
-Pose Visual Log is a development-only camera diagnostic. It records annotated evidence from the same MoveNet inference results and deterministic pose features that drive the challenge timer. It is not rendered in production builds.
+Pose Visual Log and the State Simulator are optional development-only diagnostics. They are available only when SvelteKit is running in development mode and `PUBLIC_ENABLE_POSE_DEV_TOOLS=true`. They are never rendered or runnable in production builds.
 
 ## Start a logging session
 
-1. Run `npm run dev` from the repository root.
-2. Open the app in a Chromium-based browser such as Edge or Chrome on `localhost` or HTTPS.
-3. Acknowledge the safety notice, keep **Camera mode** selected, and choose an available pixel.
-4. When camera positioning begins, find **POSE VISUAL LOG** in the developer tools panel.
-5. Select **START VISUAL LOG** and choose a local parent folder. The app creates a timestamped `pose-debug-*` subfolder.
-6. Complete framing and the plank attempt. Use **CAPTURE NOW** for an additional evidence frame when needed.
-7. Select **STOP + MANIFEST**. Completion, release, camera failure, or switching to the guided demo also stops the session automatically.
+1. Set `PUBLIC_ENABLE_POSE_DEV_TOOLS=true` in `apps/web/.env`.
+2. Run `npm run dev` from the repository root. Restart the development server after changing the flag.
+3. Open the app in a Chromium-based browser such as Edge or Chrome on `localhost` or HTTPS.
+4. Acknowledge the safety notice, keep **Camera mode** selected, and choose an available pixel.
+5. When camera positioning begins, find **POSE VISUAL LOG** in the developer tools panel.
+6. Select **START VISUAL LOG** and choose a local parent folder. The app creates a timestamped `pose-debug-*` subfolder.
+7. Complete framing and the plank attempt. Use **CAPTURE NOW** for an additional evidence frame when needed.
+8. Select **STOP + MANIFEST**. Completion, release, camera failure, or switching to the guided demo also stops the session automatically.
 
 If the browser does not support directory selection, the logger falls back to individual browser downloads. Browser download protections may require permission for multiple files; Edge or Chrome with a selected directory is the recommended workflow.
 
