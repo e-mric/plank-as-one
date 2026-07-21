@@ -1,0 +1,795 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pixel Coordinate Picker</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: Canvas;
+      --fg: CanvasText;
+      --muted: color-mix(in srgb, CanvasText 68%, Canvas);
+      --panel: color-mix(in srgb, Canvas 92%, CanvasText);
+      --line: color-mix(in srgb, CanvasText 24%, Canvas);
+      --accent: #147d72;
+      --accent-fg: #ffffff;
+      --danger: #b42318;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--fg);
+      background: var(--bg);
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    button,
+    input[type="file"],
+    select,
+    textarea {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--fg);
+      background: var(--bg);
+    }
+
+    button,
+    select {
+      min-height: 36px;
+      padding: 0 12px;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    button.primary {
+      border-color: transparent;
+      color: var(--accent-fg);
+      background: var(--accent);
+    }
+
+    button.danger {
+      color: var(--danger);
+    }
+
+    input[type="file"] {
+      max-width: 100%;
+      padding: 7px;
+    }
+
+    input[type="range"] {
+      width: 160px;
+      accent-color: var(--accent);
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 220px;
+      padding: 10px;
+      resize: vertical;
+      font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      min-height: 100vh;
+    }
+
+    .workspace {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      border-right: 1px solid var(--line);
+    }
+
+    .toolbar,
+    .sidebar {
+      background: var(--panel);
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .tool-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .zoom-label,
+    .readout,
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .readout strong {
+      color: var(--fg);
+      font-weight: 600;
+    }
+
+    .viewer {
+      min-width: 0;
+      min-height: 0;
+      overflow: auto;
+      padding: 16px;
+      background-image:
+        linear-gradient(45deg, color-mix(in srgb, CanvasText 5%, Canvas) 25%, transparent 25%),
+        linear-gradient(-45deg, color-mix(in srgb, CanvasText 5%, Canvas) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, color-mix(in srgb, CanvasText 5%, Canvas) 75%),
+        linear-gradient(-45deg, transparent 75%, color-mix(in srgb, CanvasText 5%, Canvas) 75%);
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+      background-size: 16px 16px;
+    }
+
+    .empty {
+      display: grid;
+      min-height: calc(100vh - 86px);
+      place-items: center;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .stage {
+      position: relative;
+      display: none;
+      width: max-content;
+      height: max-content;
+      border: 1px solid var(--line);
+      background: Canvas;
+    }
+
+    .stage.is-ready {
+      display: block;
+    }
+
+    #imageCanvas,
+    #pointOverlay,
+    #gridOverlay {
+      display: block;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    #pointOverlay,
+    #gridOverlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    #imageCanvas {
+      cursor: crosshair;
+    }
+
+    #gridOverlay {
+      opacity: 0.55;
+      background-image:
+        linear-gradient(to right, color-mix(in srgb, CanvasText 30%, transparent) 1px, transparent 1px),
+        linear-gradient(to bottom, color-mix(in srgb, CanvasText 30%, transparent) 1px, transparent 1px);
+    }
+
+    .sidebar {
+      min-width: 0;
+      overflow: auto;
+      padding: 14px;
+    }
+
+    .section {
+      padding: 0 0 16px;
+      margin: 0 0 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .section:last-child {
+      border-bottom: 0;
+    }
+
+    h1,
+    h2 {
+      margin: 0 0 10px;
+      font-weight: 600;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      font-size: 18px;
+    }
+
+    h2 {
+      font-size: 14px;
+    }
+
+    .label-row,
+    .action-row,
+    .nudge-grid {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .label-row select {
+      flex: 1 1 180px;
+    }
+
+    .label-row input {
+      min-height: 36px;
+      width: 100%;
+      padding: 0 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--fg);
+      background: var(--bg);
+    }
+
+    .points {
+      display: grid;
+      gap: 6px;
+      max-height: 280px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .point {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--bg);
+    }
+
+    .point.is-selected {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+
+    .point-name {
+      overflow-wrap: anywhere;
+      font-weight: 600;
+    }
+
+    .point-coords {
+      color: var(--muted);
+      font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      font-size: 13px;
+    }
+
+    .point button {
+      min-height: 30px;
+      padding: 0 9px;
+    }
+
+    .nudge-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 38px);
+      width: max-content;
+    }
+
+    .nudge-grid button {
+      width: 38px;
+      padding: 0;
+    }
+
+    .nudge-grid .blank {
+      visibility: hidden;
+    }
+
+    @media (max-width: 900px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      .workspace {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+        min-height: 60vh;
+      }
+
+      .sidebar {
+        overflow: visible;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="app">
+    <section class="workspace" aria-label="Image picker">
+      <div class="toolbar">
+        <div class="tool-group">
+          <input id="fileInput" type="file" accept="image/*" aria-label="Open image">
+          <button id="sampleButton" type="button">Open sample</button>
+        </div>
+        <div class="tool-group">
+          <label class="zoom-label" for="zoomInput">Zoom <strong id="zoomValue">8x</strong></label>
+          <input id="zoomInput" type="range" min="1" max="24" step="1" value="8">
+          <label class="zoom-label"><input id="gridInput" type="checkbox" checked> Grid</label>
+        </div>
+        <div class="readout" id="cursorReadout">x: -, y: -</div>
+      </div>
+      <div class="viewer">
+        <div id="emptyState" class="empty">Open an image to pick original pixel coordinates.</div>
+        <div id="stage" class="stage">
+          <canvas id="imageCanvas"></canvas>
+          <div id="gridOverlay"></div>
+          <svg id="pointOverlay" aria-hidden="true"></svg>
+        </div>
+      </div>
+    </section>
+
+    <aside class="sidebar" aria-label="Coordinates">
+      <div class="section">
+        <h1>Coordinate Picker</h1>
+        <div class="label-row">
+          <select id="labelSelect" aria-label="Active point label"></select>
+          <button id="clearPointButton" class="danger" type="button">Clear point</button>
+        </div>
+        <div class="label-row" style="margin-top: 8px;">
+          <input id="customLabelInput" type="text" placeholder="custom_label" aria-label="Custom label">
+          <button id="addLabelButton" type="button">Add label</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Selected Point</h2>
+        <div class="action-row">
+          <div class="nudge-grid" aria-label="Nudge selected point">
+            <span class="blank"></span>
+            <button type="button" data-nudge="0,-1" aria-label="Nudge up">^</button>
+            <span class="blank"></span>
+            <button type="button" data-nudge="-1,0" aria-label="Nudge left">&lt;</button>
+            <button type="button" data-nudge="0,1" aria-label="Nudge down">v</button>
+            <button type="button" data-nudge="1,0" aria-label="Nudge right">&gt;</button>
+          </div>
+          <div class="hint" id="selectedReadout">No point selected.</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Points</h2>
+        <div id="pointsList" class="points"></div>
+      </div>
+
+      <div class="section">
+        <h2>Export</h2>
+        <div class="action-row" style="margin-bottom: 8px;">
+          <button id="copyJsonButton" class="primary" type="button">Copy JSON</button>
+          <button id="copyCsvButton" type="button">Copy CSV</button>
+          <button id="clearAllButton" class="danger" type="button">Clear all</button>
+        </div>
+        <textarea id="outputArea" readonly spellcheck="false" aria-label="Coordinate output"></textarea>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    const defaultLabels = [
+      "nose",
+      "left_eye",
+      "right_eye",
+      "left_ear",
+      "right_ear",
+      "left_shoulder",
+      "right_shoulder",
+      "left_elbow",
+      "right_elbow",
+      "left_wrist",
+      "right_wrist",
+      "left_hip",
+      "right_hip",
+      "left_knee",
+      "right_knee",
+      "left_ankle",
+      "right_ankle"
+    ];
+
+    const skeletonEdges = [
+      ["nose", "left_eye"],
+      ["nose", "right_eye"],
+      ["left_eye", "left_ear"],
+      ["right_eye", "right_ear"],
+      ["left_shoulder", "right_shoulder"],
+      ["left_shoulder", "left_elbow"],
+      ["right_shoulder", "right_elbow"],
+      ["left_elbow", "left_wrist"],
+      ["right_elbow", "right_wrist"],
+      ["left_shoulder", "left_hip"],
+      ["right_shoulder", "right_hip"],
+      ["left_hip", "right_hip"],
+      ["left_hip", "left_knee"],
+      ["left_knee", "left_ankle"],
+      ["right_hip", "right_knee"],
+      ["right_knee", "right_ankle"]
+    ];
+
+    const state = {
+      image: null,
+      imageName: "",
+      width: 0,
+      height: 0,
+      zoom: 8,
+      labels: [...defaultLabels],
+      selectedLabel: defaultLabels[0],
+      points: {}
+    };
+
+    const fileInput = document.getElementById("fileInput");
+    const sampleButton = document.getElementById("sampleButton");
+    const zoomInput = document.getElementById("zoomInput");
+    const zoomValue = document.getElementById("zoomValue");
+    const gridInput = document.getElementById("gridInput");
+    const cursorReadout = document.getElementById("cursorReadout");
+    const emptyState = document.getElementById("emptyState");
+    const stage = document.getElementById("stage");
+    const canvas = document.getElementById("imageCanvas");
+    const ctx = canvas.getContext("2d");
+    const gridOverlay = document.getElementById("gridOverlay");
+    const pointOverlay = document.getElementById("pointOverlay");
+    const labelSelect = document.getElementById("labelSelect");
+    const clearPointButton = document.getElementById("clearPointButton");
+    const customLabelInput = document.getElementById("customLabelInput");
+    const addLabelButton = document.getElementById("addLabelButton");
+    const selectedReadout = document.getElementById("selectedReadout");
+    const pointsList = document.getElementById("pointsList");
+    const outputArea = document.getElementById("outputArea");
+    const copyJsonButton = document.getElementById("copyJsonButton");
+    const copyCsvButton = document.getElementById("copyCsvButton");
+    const clearAllButton = document.getElementById("clearAllButton");
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function escapeHtml(value) {
+      return value
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function setImage(img, name) {
+      state.image = img;
+      state.imageName = name;
+      state.width = img.naturalWidth || img.width;
+      state.height = img.naturalHeight || img.height;
+      state.points = {};
+      canvas.width = state.width;
+      canvas.height = state.height;
+      pointOverlay.setAttribute("viewBox", `0 0 ${state.width} ${state.height}`);
+      emptyState.style.display = "none";
+      stage.classList.add("is-ready");
+      drawImage();
+      updateZoom();
+      renderAll();
+    }
+
+    function drawImage() {
+      if (!state.image) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(state.image, 0, 0, state.width, state.height);
+    }
+
+    function updateZoom() {
+      state.zoom = Number(zoomInput.value);
+      zoomValue.textContent = `${state.zoom}x`;
+      const scaledWidth = `${state.width * state.zoom}px`;
+      const scaledHeight = `${state.height * state.zoom}px`;
+      canvas.style.width = scaledWidth;
+      canvas.style.height = scaledHeight;
+      pointOverlay.style.width = scaledWidth;
+      pointOverlay.style.height = scaledHeight;
+      gridOverlay.style.width = scaledWidth;
+      gridOverlay.style.height = scaledHeight;
+      gridOverlay.style.backgroundSize = `${state.zoom}px ${state.zoom}px`;
+      gridOverlay.style.display = gridInput.checked && state.zoom >= 4 ? "block" : "none";
+      renderOverlay();
+    }
+
+    function imageCoordsFromEvent(event) {
+      if (!state.image) return null;
+      const rect = canvas.getBoundingClientRect();
+      const x = Math.floor(((event.clientX - rect.left) / rect.width) * state.width);
+      const y = Math.floor(((event.clientY - rect.top) / rect.height) * state.height);
+      if (x < 0 || y < 0 || x >= state.width || y >= state.height) return null;
+      return { x, y };
+    }
+
+    function setPoint(label, x, y) {
+      state.points[label] = {
+        x: clamp(x, 0, state.width - 1),
+        y: clamp(y, 0, state.height - 1)
+      };
+      state.selectedLabel = label;
+      labelSelect.value = label;
+      renderAll();
+    }
+
+    function activePoint() {
+      return state.points[state.selectedLabel] || null;
+    }
+
+    function renderLabels() {
+      labelSelect.innerHTML = state.labels
+        .map(label => `<option value="${escapeHtml(label)}">${escapeHtml(label)}</option>`)
+        .join("");
+      labelSelect.value = state.selectedLabel;
+    }
+
+    function renderOverlay() {
+      const r = Math.max(1.25, 5 / state.zoom);
+      const stroke = Math.max(0.5, 2 / state.zoom);
+      const lines = skeletonEdges
+        .map(([a, b]) => {
+          const pa = state.points[a];
+          const pb = state.points[b];
+          if (!pa || !pb) return "";
+          return `<line x1="${pa.x + 0.5}" y1="${pa.y + 0.5}" x2="${pb.x + 0.5}" y2="${pb.y + 0.5}" stroke="var(--accent)" stroke-width="${stroke}" opacity="0.85" />`;
+        })
+        .join("");
+      const circles = Object.entries(state.points)
+        .map(([label, point]) => {
+          const selected = label === state.selectedLabel;
+          const radius = selected ? r * 1.4 : r;
+          const fill = selected ? "var(--accent)" : "Canvas";
+          return `<circle cx="${point.x + 0.5}" cy="${point.y + 0.5}" r="${radius}" fill="${fill}" stroke="var(--accent)" stroke-width="${stroke}" />`;
+        })
+        .join("");
+      pointOverlay.innerHTML = `${lines}${circles}`;
+    }
+
+    function renderPointsList() {
+      pointsList.innerHTML = state.labels
+        .map(label => {
+          const point = state.points[label];
+          const coords = point ? `${point.x}, ${point.y}` : "-";
+          const selected = label === state.selectedLabel ? " is-selected" : "";
+          return `
+            <div class="point${selected}">
+              <button type="button" data-select-label="${escapeHtml(label)}" aria-label="Select ${escapeHtml(label)}">
+                <span class="point-name">${escapeHtml(label)}</span><br>
+                <span class="point-coords">${coords}</span>
+              </button>
+              <button type="button" data-remove-label="${escapeHtml(label)}" aria-label="Clear ${escapeHtml(label)}">Clear</button>
+            </div>
+          `;
+        })
+        .join("");
+    }
+
+    function exportObject() {
+      const points = {};
+      for (const label of state.labels) {
+        if (state.points[label]) {
+          points[label] = [state.points[label].x, state.points[label].y];
+        }
+      }
+      return {
+        image: {
+          name: state.imageName,
+          width: state.width,
+          height: state.height
+        },
+        points
+      };
+    }
+
+    function csvText() {
+      const rows = ["label,x,y"];
+      for (const label of state.labels) {
+        const point = state.points[label];
+        if (point) rows.push(`${label},${point.x},${point.y}`);
+      }
+      return rows.join("\n");
+    }
+
+    async function copyText(text) {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+      outputArea.removeAttribute("readonly");
+      const previousValue = outputArea.value;
+      outputArea.value = text;
+      outputArea.select();
+      document.execCommand("copy");
+      outputArea.value = previousValue;
+      outputArea.setAttribute("readonly", "readonly");
+      outputArea.blur();
+    }
+
+    function renderOutput() {
+      outputArea.value = JSON.stringify(exportObject(), null, 2);
+    }
+
+    function renderSelected() {
+      const point = activePoint();
+      selectedReadout.textContent = point
+        ? `${state.selectedLabel}: x ${point.x}, y ${point.y}`
+        : `${state.selectedLabel}: not set`;
+    }
+
+    function renderAll() {
+      renderLabels();
+      renderOverlay();
+      renderPointsList();
+      renderSelected();
+      renderOutput();
+    }
+
+    function loadImageFromUrl(url, name) {
+      const img = new Image();
+      img.onload = () => setImage(img, name);
+      img.onerror = () => {
+        emptyState.textContent = "Could not open the sample image from this location.";
+        emptyState.style.display = "grid";
+      };
+      img.src = url;
+    }
+
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(img.src);
+        setImage(img, file.name);
+      };
+      img.src = URL.createObjectURL(file);
+    });
+
+    sampleButton.addEventListener("click", () => {
+      loadImageFromUrl("apps/web/static/charaplanko-pixel.png", "charaplanko-pixel.png");
+    });
+
+    zoomInput.addEventListener("input", updateZoom);
+    gridInput.addEventListener("change", updateZoom);
+
+    canvas.addEventListener("mousemove", event => {
+      const coords = imageCoordsFromEvent(event);
+      cursorReadout.innerHTML = coords
+        ? `x: <strong>${coords.x}</strong>, y: <strong>${coords.y}</strong>`
+        : "x: -, y: -";
+    });
+
+    canvas.addEventListener("mouseleave", () => {
+      cursorReadout.textContent = "x: -, y: -";
+    });
+
+    canvas.addEventListener("click", event => {
+      const coords = imageCoordsFromEvent(event);
+      if (!coords) return;
+      setPoint(state.selectedLabel, coords.x, coords.y);
+      const currentIndex = state.labels.indexOf(state.selectedLabel);
+      const nextUnset = state.labels.slice(currentIndex + 1).find(label => !state.points[label]);
+      if (nextUnset) {
+        state.selectedLabel = nextUnset;
+        labelSelect.value = nextUnset;
+      }
+      renderAll();
+    });
+
+    labelSelect.addEventListener("change", () => {
+      state.selectedLabel = labelSelect.value;
+      renderAll();
+    });
+
+    addLabelButton.addEventListener("click", () => {
+      const label = customLabelInput.value.trim().replace(/\s+/g, "_");
+      if (!label || state.labels.includes(label)) return;
+      state.labels.push(label);
+      state.selectedLabel = label;
+      customLabelInput.value = "";
+      renderAll();
+    });
+
+    customLabelInput.addEventListener("keydown", event => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addLabelButton.click();
+      }
+    });
+
+    clearPointButton.addEventListener("click", () => {
+      delete state.points[state.selectedLabel];
+      renderAll();
+    });
+
+    pointsList.addEventListener("click", event => {
+      const selectButton = event.target.closest("[data-select-label]");
+      const removeButton = event.target.closest("[data-remove-label]");
+      if (removeButton) {
+        delete state.points[removeButton.dataset.removeLabel];
+        renderAll();
+        return;
+      }
+      if (selectButton) {
+        state.selectedLabel = selectButton.dataset.selectLabel;
+        renderAll();
+      }
+    });
+
+    document.querySelectorAll("[data-nudge]").forEach(button => {
+      button.addEventListener("click", () => {
+        const point = activePoint();
+        if (!point) return;
+        const [dx, dy] = button.dataset.nudge.split(",").map(Number);
+        setPoint(state.selectedLabel, point.x + dx, point.y + dy);
+      });
+    });
+
+    document.addEventListener("keydown", event => {
+      if (event.target.matches("input, textarea, select")) return;
+      const point = activePoint();
+      if (!point) return;
+      const moves = {
+        ArrowUp: [0, -1],
+        ArrowDown: [0, 1],
+        ArrowLeft: [-1, 0],
+        ArrowRight: [1, 0]
+      };
+      if (!moves[event.key]) return;
+      event.preventDefault();
+      const multiplier = event.shiftKey ? 10 : 1;
+      const [dx, dy] = moves[event.key];
+      setPoint(state.selectedLabel, point.x + dx * multiplier, point.y + dy * multiplier);
+    });
+
+    copyJsonButton.addEventListener("click", async () => {
+      await copyText(outputArea.value);
+      copyJsonButton.textContent = "Copied";
+      setTimeout(() => {
+        copyJsonButton.textContent = "Copy JSON";
+      }, 900);
+    });
+
+    copyCsvButton.addEventListener("click", async () => {
+      await copyText(csvText());
+      copyCsvButton.textContent = "Copied";
+      setTimeout(() => {
+        copyCsvButton.textContent = "Copy CSV";
+      }, 900);
+    });
+
+    clearAllButton.addEventListener("click", () => {
+      state.points = {};
+      renderAll();
+    });
+
+    renderAll();
+    updateZoom();
+  </script>
+</body>
+
+</html>
