@@ -9,20 +9,23 @@
   import { CAMERA_CONSTRAINTS, describeFraming, getCameraErrorMessage } from '$lib/pose/setup-machine.js';
   import { createAudioFeedback } from '$lib/pose/audio-feedback.js';
   import { analyzePoseFrame, resetPoseAnalyzer } from '$lib/pose/engine.js';
+  import { createSpriteStateMatcher } from '$lib/pose/sprite-matcher.js';
+  import spriteStateData from '$lib/pose/sprite-states.json';
+  import SpriteAvatar from '$lib/SpriteAvatar.svelte';
   import { addCompletionDay, calculateStreak, COMPLETION_DAYS_STORAGE_KEY, formatResetCountdown, normalizeCompletionDays } from '$lib/live-status.js';
 
   type Pixel = { id: number; status: string };
   type Action = { type: string; mode?: string; cellId?: number; form?: string; ms?: number; correction?: any; ready?: boolean };
   type DemoTipId = 'welcome' | 'positioning' | 'countdown' | 'active' | 'correction' | 'recovery' | 'complete';
 
-  const CELEBRATION_FRAME_SECONDS = 0.09;
-  const celebrationFrames = Array.from({ length: 15 }, (_, index) => {
-    const frame = String(index + 1).padStart(2, '0');
-    return {
-      src: `/poses/pose-celebrate-${frame}.png`,
-      alt: index === 14 ? 'Pixel-art person celebrating with both fists raised' : 'Pixel-art person celebrating after completing the plank',
-    };
-  });
+  const spriteManifest: any = spriteStateData;
+  const spriteFramesById: Map<string, any> = new Map<string, any>(spriteManifest.frames.map((frame: any) => [frame.id, frame]));
+  const spriteMatcher = createSpriteStateMatcher(spriteManifest);
+  const CELEBRATION_FRAME_SECONDS = 0.16;
+  const celebrationFrames = ['celebrate-01', 'celebrate-02', 'celebrate-03'].map((id, index) => ({
+    frame: spriteFramesById.get(id),
+    alt: index === 2 ? 'Pixel-art athlete celebrating with both fists raised' : 'Pixel-art athlete celebrating after completing the plank',
+  }));
   const DEMO_TIPS: Record<DemoTipId, { step: string; title: string; copy: string; action: string }> = {
     welcome: { step: 'TIP 1 OF 6', title: 'CHOOSE A PIXEL', copy: 'Select any outlined pixel in the shared artwork. The guided demo uses an isolated copy, so your choice will not reserve a real pixel.', action: 'LET ME CHOOSE' },
     positioning: { step: 'TIP 2 OF 6', title: 'GET INTO POSITION', copy: 'Camera mode normally waits until your full body is visible and stable. For this walkthrough, use the button below to simulate a ready plank.', action: 'SIMULATE READY POSITION' },
@@ -62,6 +65,7 @@
   let cameraRequestId = 0;
   let cameraStatus = 'idle';
   let cameraMessage = 'CAMERA STARTS AFTER PIXEL SELECTION';
+  let matchedSpriteFrameId: string | null = null;
   let audioMuted = false;
   const audio = createAudioFeedback();
   let lastAudioCorrection = '';
@@ -123,19 +127,23 @@
       : state.stage === 'grace'
         ? Math.max(0, 5 - Math.floor(state.graceMs / 1000))
         : 5;
-  $: pose = state.lastOutcome === 'complete'
-    ? { kind: 'celebrate', alt: 'Pixel-art person celebrating a completed plank' }
+  $: fallbackPose = state.lastOutcome === 'complete'
+    ? { kind: 'celebrate', frameId: null, alt: 'Pixel-art athlete celebrating a completed plank' }
     : state.lastOutcome === 'failed'
-      ? { kind: 'exhausted', src: '/poses/pose-exhausted.png', alt: 'Pixel-art person exhausted after an incomplete plank' }
+      ? { kind: 'exhausted', frameId: 'celebrate-01', alt: 'Pixel-art athlete recovering after an incomplete plank' }
       : (state.stage === 'active' || state.stage === 'complete') && (state.form === 'valid' || (state.form === 'tracking' && !trackingVisible))
-        ? { kind: 'perfect', src: '/poses/pose-perfect.png', alt: 'Pixel-art person holding a perfect plank' }
+        ? { kind: 'perfect', frameId: 'forearm-plank-01', alt: 'Pixel-art athlete holding a forearm plank' }
     : state.form === 'hips-low' && (state.stage === 'grace' || state.stage === 'paused')
-      ? { kind: 'hips-low', src: '/poses/pose-hips-low.png', alt: 'Pixel-art person planking with hips too low' }
+      ? { kind: 'hips-low', frameId: 'lowering-02', alt: 'Pixel-art athlete with low plank form' }
     : state.form === 'hips-high' && (state.stage === 'grace' || state.stage === 'paused')
-      ? { kind: 'hips-high', src: '/poses/pose-hips-high.png', alt: 'Pixel-art person planking with hips too high' }
+      ? { kind: 'hips-high', frameId: 'forearm-plank-high', alt: 'Pixel-art athlete planking with hips too high' }
     : state.stage === 'grace' || state.stage === 'paused' || state.form !== 'valid'
-      ? { kind: 'bad', src: '/poses/pose-bad.png', alt: 'Pixel-art person holding a bad plank form' }
-      : { kind: 'ready', src: '/poses/pose-ready.png', alt: 'Pixel-art person in the ready position' };
+      ? { kind: 'bad', frameId: 'forearm-plank-knees-02', alt: 'Pixel-art athlete resting on their knees' }
+      : { kind: 'ready', frameId: 'kneel-02', alt: 'Pixel-art athlete getting into position' };
+  $: pose = fallbackPose.kind === 'celebrate' || fallbackPose.kind === 'exhausted' || !matchedSpriteFrameId
+    ? fallbackPose
+    : { ...fallbackPose, frameId: matchedSpriteFrameId, alt: `Pixel-art athlete matching live pose state ${matchedSpriteFrameId}` };
+  $: poseFrame = pose.frameId ? spriteFramesById.get(pose.frameId) : null;
 
   $: showCameraSetup = !guidedDemo && state.mode === 'camera' && state.stage === 'positioning';
   $: sharedStatusLabel = sharedStatus === 'live'
@@ -396,6 +404,16 @@
     }
     cameraMessage = result.setupMessage || describeFraming(result.quality);
     if (result.quality?.tracked && result.setupReady) cameraStatus = 'ready';
+    if (result.tracking) {
+      const spriteMatch = spriteMatcher.update(poseResult, {
+        width: inferenceVideo.videoWidth || 1,
+        height: inferenceVideo.videoHeight || 1,
+        side: result.quality?.side || 'left',
+        roles: state.stage === 'positioning' ? ['setup', 'plank'] : ['plank'],
+        now,
+      });
+      if (spriteMatch?.id) matchedSpriteFrameId = spriteMatch.id;
+    }
     if (state.stage === 'positioning') {
       if (result.setupReady) dispatch({ type: 'pose-update', ready: true, form: 'valid' });
       return;
@@ -418,6 +436,8 @@
     cameraStream?.getTracks().forEach((track) => track.stop());
     cameraStream = null;
     resetPoseAnalyzer();
+    spriteMatcher.reset();
+    matchedSpriteFrameId = null;
     if (videoEl) videoEl.srcObject = null;
     if (resetStatus) {
       cameraStatus = 'idle';
@@ -696,19 +716,18 @@
       {#if pose.kind === 'celebrate'}
         <div class="celebration-sequence" role="img" aria-label={pose.alt}>
           {#each celebrationFrames as frame, index}
-            <img
+            <div
               class:celebration-final={index === celebrationFrames.length - 1}
               class="celebration-frame"
-              src={frame.src}
-              alt={frame.alt}
-              aria-hidden={index < celebrationFrames.length - 1 ? 'true' : undefined}
               style={`--celebration-delay:${index * CELEBRATION_FRAME_SECONDS}s;--celebration-duration:${celebrationFrames.length * CELEBRATION_FRAME_SECONDS}s`}
-            />
+            >
+              <SpriteAvatar atlas={spriteManifest.atlas} frame={frame.frame} alt={frame.alt} decorative={index < celebrationFrames.length - 1} />
+            </div>
           {/each}
         </div>
-      {:else}
+      {:else if poseFrame}
         <div class="pose-visual">
-          <img class={pose.kind} src={pose.src} alt={pose.alt} />
+          <div class={`sprite-avatar-shell ${pose.kind}`}><SpriteAvatar atlas={spriteManifest.atlas} frame={poseFrame} alt={pose.alt} /></div>
           {#if pose.kind === 'hips-low' || pose.kind === 'hips-high'}
             <span class="body-region-highlight" aria-hidden="true"></span>
           {/if}
@@ -800,9 +819,9 @@
   .status-row { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }.status-group { display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
   .chip { display:inline-flex; align-items:center; min-height:38px; padding:9px 13px; border:1px solid var(--line); border-radius:999px; background:rgba(255,250,245,.88); color:var(--muted); font:700 11px/1 var(--mono); letter-spacing:.02em; }
   .hero { width:min(800px,100%); margin:58px auto 0; text-align:center; }.brand-logo { --logo-pixel:clamp(3px,.82vw,7px); display:flex; justify-content:center; margin:0 0 16px; }.brand-logo-lockup,.brand-logo-solid-group,.brand-logo-word { display:flex; align-items:center; }.brand-logo-lockup { justify-content:center; gap:calc(var(--logo-pixel) * 2); max-width:100%; filter:drop-shadow(1px 0 0 var(--coral-dark)) drop-shadow(-1px 0 0 var(--coral-dark)) drop-shadow(0 1px 0 var(--coral-dark)) drop-shadow(0 -1px 0 var(--coral-dark)) drop-shadow(calc(var(--logo-pixel) * .62) calc(var(--logo-pixel) * .72) 0 rgba(53,34,29,.28)); }.brand-logo-solid-group { gap:calc(var(--logo-pixel) * 2.2); }.brand-logo-word { gap:calc(var(--logo-pixel) * .72); }.brand-logo-letter { position:relative; display:grid; grid-template-columns:repeat(7,var(--logo-pixel)); grid-template-rows:repeat(9,var(--logo-pixel)); }.brand-logo-letter > i { position:relative; z-index:1; display:block; width:var(--logo-pixel); height:var(--logo-pixel); }.brand-logo-letter > i.on { transform-origin:center; animation:logo-title-pixel-shimmer 5.25s steps(1,end) infinite; animation-delay:calc(var(--logo-phase) * -67ms); }.brand-logo-letter.solid > i.on,.brand-logo-letter.outline > i.on { background:var(--coral); }.brand-logo-letter.solid > i.on { box-shadow:inset 0 calc(var(--logo-pixel) * -.12) 0 rgba(120,37,25,.18); }.logo-o-random-fill { position:absolute; z-index:0; inset:0; display:grid; grid-template-columns:repeat(7,var(--logo-pixel)); grid-template-rows:repeat(9,var(--logo-pixel)); }.logo-o-random-fill i { width:var(--logo-pixel); height:var(--logo-pixel); background:var(--coral); opacity:0; transform:scale(.35); }.logo-o-random-fill i.filled { opacity:1; transform:scale(1); animation:logo-o-pixel-pop .18s steps(2,end); }.mode-selector { display:flex; justify-content:center; gap:10px; }.mode-chip { min-height:34px; background:transparent; cursor:pointer; }.mode-chip.selected { border-color:var(--coral); color:var(--coral-dark); box-shadow:0 0 0 2px rgba(255,90,54,.12); }.mode-chip:disabled { cursor:not-allowed; opacity:.6; }.mode-chip.selected:disabled { opacity:1; }.timer { margin:0; font:700 clamp(52px,11vw,108px)/.9 var(--mono); letter-spacing:-.08em; }.timer small { font-size:.22em; letter-spacing:0; margin-left:8px; color:var(--muted); }.validation { display:inline-flex; align-items:center; gap:8px; margin-top:16px; padding:9px 13px; border:1px solid var(--line); border-radius:999px; color:var(--muted); background:rgba(255,250,245,.85); font:700 10px var(--mono); }.selection-chip { display:flex; width:max-content; margin:16px auto 0; background:transparent; }
-  .pose-stage { position:relative; display:grid; align-items:center; width:min(900px,100%); min-height:210px; margin:22px auto 0; }.pose-slot { width:min(560px,100%); margin:0 auto; text-align:center; }.pose-slot img { display:block; width:100%; height:auto; max-height:180px; object-fit:contain; image-rendering:pixelated; }.pose-slot img.hips-low { transform:scale(.68); transform-origin:center; }.pose-slot img.hips-high { transform:scale(.7); transform-origin:center; }.pose-slot img.exhausted { max-height:105px; }.celebration-sequence { position:relative; width:100%; height:180px; }.pose-slot img.celebration-frame { position:absolute; inset:0; width:100%; height:100%; max-height:none; object-fit:contain; opacity:0; animation:celebration-frame-slot var(--celebration-duration) steps(1,end) forwards; animation-delay:var(--celebration-delay); }.pose-slot img.celebration-frame.celebration-final { animation:celebration-final-frame 1ms linear forwards; animation-delay:var(--celebration-delay); }.form-feedback { margin:10px auto 0; text-align:center; }.form-feedback-label { color:var(--ink); font:700 12px/1 var(--mono); letter-spacing:.04em; }.grace-cells { display:flex; justify-content:center; gap:12px; margin-top:12px; }.grace-cell { width:27px; height:27px; border:2px solid var(--coral); border-radius:5px; background:transparent; box-sizing:border-box; }.grace-cell.filled { background:var(--coral); box-shadow:inset 0 0 0 1px rgba(255,255,255,.2); }
+  .pose-stage { position:relative; display:grid; align-items:center; width:min(900px,100%); min-height:210px; margin:22px auto 0; }.pose-slot { width:min(560px,100%); margin:0 auto; text-align:center; }.sprite-avatar-shell { width:100%; height:180px; }.celebration-sequence { position:relative; width:100%; height:180px; }.celebration-frame { position:absolute; inset:0; width:100%; height:100%; opacity:0; animation:celebration-frame-slot var(--celebration-duration) steps(1,end) forwards; animation-delay:var(--celebration-delay); }.celebration-frame.celebration-final { animation:celebration-final-frame 1ms linear forwards; animation-delay:var(--celebration-delay); }.form-feedback { margin:10px auto 0; text-align:center; }.form-feedback-label { color:var(--ink); font:700 12px/1 var(--mono); letter-spacing:.04em; }.grace-cells { display:flex; justify-content:center; gap:12px; margin-top:12px; }.grace-cell { width:27px; height:27px; border:2px solid var(--coral); border-radius:5px; background:transparent; box-sizing:border-box; }.grace-cell.filled { background:var(--coral); box-shadow:inset 0 0 0 1px rgba(255,255,255,.2); }
   .camera-setup { display:grid; grid-template-columns:minmax(240px,360px) minmax(220px,1fr); gap:18px; align-items:center; width:min(760px,100%); margin:0 auto 18px; padding:14px; border:1px solid var(--line); border-radius:14px; background:rgba(255,250,245,.82); }.camera-preview-wrap { position:relative; overflow:hidden; aspect-ratio:16/9; border:1px solid var(--line); border-radius:9px; background:#2d2421; }.camera-preview { display:block; width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }.framing-guide { position:absolute; inset:14% 7%; display:grid; place-items:center; border:2px dashed rgba(255,250,245,.82); border-radius:42%; pointer-events:none; }.framing-guide span { width:45%; height:2px; background:rgba(255,250,245,.6); }.camera-loading { position:absolute; inset:0; display:grid; place-items:center; padding:10px; background:rgba(36,25,22,.62); color:#fffaf5; text-align:center; font:700 12px var(--mono); }.camera-copy { display:flex; flex-direction:column; gap:8px; color:var(--muted); font:700 11px/1.35 var(--mono); }.camera-copy strong { color:var(--coral-dark); font-size:16px; }.audio-check { display:flex; flex-wrap:wrap; align-items:center; gap:7px; margin-top:5px; }.audio-check span { width:100%; color:var(--ink); }.audio-check .btn,.camera-copy > .btn { padding:8px 10px; font-size:9px; }
-  .pose-visual { position:relative; width:100%; height:180px; }.pose-visual > img { height:100%; max-height:none; }.body-region-highlight { position:absolute; z-index:2; top:54%; left:48%; width:52px; height:52px; transform:translate(-50%,-50%); border:3px solid var(--coral); border-radius:50%; background:rgba(255,90,54,.24); box-shadow:0 0 0 8px rgba(255,90,54,.12); animation:region-pulse .8s steps(2,end) infinite; pointer-events:none; }.correction-arrow-slot { display:flex; align-items:center; justify-content:center; height:54px; }.pixel-correction-arrow { position:relative; display:block; width:48px; height:36px; transform:rotate(-90deg); transform-origin:center; filter:drop-shadow(2px 2px 0 rgba(255,90,54,.22)); image-rendering:pixelated; }.pixel-correction-arrow::before,.pixel-correction-arrow::after { content:""; position:absolute; display:block; }.pixel-correction-arrow::before { inset:0; background:var(--coral-dark); clip-path:polygon(0 22%,50% 22%,50% 0,67% 0,67% 11%,75% 11%,75% 22%,83% 22%,83% 33%,92% 33%,92% 44%,100% 44%,100% 56%,92% 56%,92% 67%,83% 67%,83% 78%,75% 78%,75% 89%,67% 89%,67% 100%,50% 100%,50% 78%,0 78%); }.pixel-correction-arrow::after { inset:4px; background:linear-gradient(180deg,var(--peach) 0 34%,#ff9c68 34% 64%,var(--coral) 64% 82%,var(--coral-dark) 82% 100%); clip-path:polygon(0 21%,50% 21%,50% 0,65% 0,65% 11%,73% 11%,73% 21%,81% 21%,81% 32%,89% 32%,89% 43%,100% 43%,100% 57%,89% 57%,89% 68%,81% 68%,81% 79%,73% 79%,73% 89%,65% 89%,65% 100%,50% 100%,50% 79%,0 79%); }.pixel-correction-arrow.down { transform:rotate(90deg); }
+  .pose-visual { position:relative; width:100%; height:180px; }.body-region-highlight { position:absolute; z-index:2; top:54%; left:48%; width:52px; height:52px; transform:translate(-50%,-50%); border:3px solid var(--coral); border-radius:50%; background:rgba(255,90,54,.24); box-shadow:0 0 0 8px rgba(255,90,54,.12); animation:region-pulse .8s steps(2,end) infinite; pointer-events:none; }.correction-arrow-slot { display:flex; align-items:center; justify-content:center; height:54px; }.pixel-correction-arrow { position:relative; display:block; width:48px; height:36px; transform:rotate(-90deg); transform-origin:center; filter:drop-shadow(2px 2px 0 rgba(255,90,54,.22)); image-rendering:pixelated; }.pixel-correction-arrow::before,.pixel-correction-arrow::after { content:""; position:absolute; display:block; }.pixel-correction-arrow::before { inset:0; background:var(--coral-dark); clip-path:polygon(0 22%,50% 22%,50% 0,67% 0,67% 11%,75% 11%,75% 22%,83% 22%,83% 33%,92% 33%,92% 44%,100% 44%,100% 56%,92% 56%,92% 67%,83% 67%,83% 78%,75% 78%,75% 89%,67% 89%,67% 100%,50% 100%,50% 78%,0 78%); }.pixel-correction-arrow::after { inset:4px; background:linear-gradient(180deg,var(--peach) 0 34%,#ff9c68 34% 64%,var(--coral) 64% 82%,var(--coral-dark) 82% 100%); clip-path:polygon(0 21%,50% 21%,50% 0,65% 0,65% 11%,73% 11%,73% 21%,81% 21%,81% 32%,89% 32%,89% 43%,100% 43%,100% 57%,89% 57%,89% 68%,81% 68%,81% 79%,73% 79%,73% 89%,65% 89%,65% 100%,50% 100%,50% 79%,0 79%); }.pixel-correction-arrow.down { transform:rotate(90deg); }
   .modal-backdrop { position:fixed; inset:0; z-index:20; display:grid; place-items:center; padding:24px; overflow-y:auto; background:rgba(255,244,234,.72); backdrop-filter:blur(5px); }.panel { margin:26px auto 0; width:min(660px,100%); border:1px solid var(--line); border-radius:16px; background:rgba(255,250,245,.96); padding:18px; box-shadow:0 18px 60px rgba(120,61,35,.18); }.panel.modal { width:min(620px,calc(100vw - 48px)); max-height:calc(100vh - 48px); margin:0; overflow-y:auto; }.panel h2 { margin:0 0 8px; font-size:18px; }.panel p { margin:7px 0; color:var(--muted); line-height:1.45; font-size:14px; }.btn { border:1px solid var(--coral); border-radius:999px; padding:10px 15px; background:transparent; color:var(--coral-dark); font:700 11px var(--mono); letter-spacing:.02em; }.btn:hover,.btn.primary { background:var(--coral); color:#fff; }.safety { text-align:left; }.safety h2 { font:700 14px var(--mono); letter-spacing:.06em; }.safety strong { color:var(--coral-dark); }.safety-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:14px; }
   .canvas-wrap { position:relative; width:min(760px,100%); margin:38px auto 0; }.canvas-meta { display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:4px; }.canvas-meta span { color:var(--muted); font:700 10px var(--mono); }.canvas-meta .canvas-count { margin-left:auto; }.state-notice { margin:7px 0 10px; color:var(--coral-dark); font:700 10px/1.3 var(--mono); text-align:center; }
   .canvas { display:grid; grid-template-columns:repeat(var(--art-width),1fr); gap:2px; width:min(720px,100%); margin:0 auto; padding:18px; border:0; background:transparent; }.cell { aspect-ratio:1; min-width:0; border:0; border-radius:1px; background:transparent; padding:0; transition:transform .1s ease,filter .1s; }.cell.target { border:1px solid rgba(255,164,127,.68); background:rgba(255,228,210,.48); }.cell.target:not(:disabled):hover,.cell.target:not(:disabled):focus-visible { transform:scale(1.16); filter:brightness(.96); outline:2px solid var(--coral); outline-offset:1px; }.cell.locked { border-color:var(--coral); background:var(--coral); }.cell.pending,.cell.other { border-color:var(--coral); background:var(--coral); animation:pulse 1.25s ease-in-out infinite; box-shadow:0 0 0 4px rgba(255,90,54,.16); }.cell.other { opacity:.65; animation-delay:-.45s; transform:scale(.72); }.cell.empty { pointer-events:none; }
@@ -811,11 +830,11 @@
   .demo-tip { position:fixed; z-index:30; top:150px; right:max(18px,calc((100vw - 1120px)/2)); width:min(390px,calc(100vw - 36px)); margin:0; border:2px solid var(--coral); background:rgba(255,250,245,.96); box-shadow:0 16px 45px rgba(120,61,35,.2); text-align:left; }.demo-tip.canvas-tip { top:auto; bottom:24px; }.demo-tip h2 { margin-top:10px; color:var(--coral-dark); font:700 20px/1.1 var(--mono); letter-spacing:.04em; }.demo-tip-progress { color:var(--coral); font:800 10px/1 var(--mono); letter-spacing:.1em; }.demo-tip .safety-actions { margin-top:20px; }
   @media(max-width:900px){.pose-stage{display:block;min-height:0}.camera-setup{grid-template-columns:1fr;width:min(560px,100%)}.camera-setup.camera-runtime-hidden{width:2px}.dev-tools{position:static;transform:none;width:min(560px,100%);margin:14px auto 0;flex-direction:row;flex-wrap:wrap;justify-content:center}.dev-tools strong{width:100%}}
   @media(max-width:600px){.page{padding:20px 15px 32px}.status-row{align-items:flex-start}.status-row .mode-selector{gap:5px}.chip{font-size:9px;min-height:32px;padding:8px 9px}.hero{margin-top:44px}.modal-backdrop{padding:15px}.panel{padding:15px}.panel.modal{width:min(620px,calc(100vw - 30px));max-height:calc(100vh - 30px)}.demo-tip,.demo-tip.canvas-tip{top:auto;right:15px;bottom:15px;width:calc(100vw - 30px);max-height:46vh;overflow-y:auto}.canvas{gap:1px;padding:8px}.grace-cells{gap:8px}.grace-cell{width:24px;height:24px}}
-  @media(prefers-reduced-motion:reduce){.cell.pending,.cell.other{animation:none;box-shadow:0 0 0 7px rgba(255,90,54,.16)}.body-region-highlight{animation:none}.pose-slot img.celebration-frame{display:none;animation:none}.pose-slot img.celebration-frame:last-child{display:block;opacity:1}.brand-logo-letter>i.on,.logo-o-random-fill i.filled{animation:none}}
+  @media(prefers-reduced-motion:reduce){.cell.pending,.cell.other{animation:none;box-shadow:0 0 0 7px rgba(255,90,54,.16)}.body-region-highlight{animation:none}.celebration-frame{display:none;animation:none}.celebration-frame:last-child{display:block;opacity:1}.brand-logo-letter>i.on,.logo-o-random-fill i.filled{animation:none}}
   .pixel-correction-arrow.sideways { transform:rotate(0deg); }.pixel-correction-arrow.sideways.back { transform:rotate(180deg); }
   @keyframes region-pulse { 50% { transform:translate(-50%,-50%) scale(1.18); box-shadow:0 0 0 14px rgba(255,90,54,0); } }
   @keyframes logo-title-pixel-shimmer { 0%,72%,100% { opacity:1; transform:scale(1); filter:none; } 73%,76% { opacity:.32; transform:scale(.48); filter:brightness(.9); } 77%,82% { opacity:1; transform:scale(1.3); filter:brightness(1.35); } 83%,88% { opacity:1; transform:scale(1); filter:none; } }
   @keyframes logo-o-pixel-pop { 0% { opacity:.25; transform:scale(.25); } 55% { opacity:1; transform:scale(1.35); } 100% { opacity:1; transform:scale(1); } }
-  @keyframes celebration-frame-slot { 0%,6.666% { opacity:1; } 6.667%,100% { opacity:0; } }
+  @keyframes celebration-frame-slot { 0%,33.332% { opacity:1; } 33.333%,100% { opacity:0; } }
   @keyframes celebration-final-frame { to { opacity:1; } }
 </style>

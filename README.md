@@ -71,6 +71,8 @@ To run the persistent shared canvas, follow [`supabase/README.md`](./supabase/RE
 
 In a development build, **DEV TOOLS** can simulate readiness, valid form, low hips, high hips, tracking loss, and completion. **POSE VISUAL LOG** can also save consented, annotated camera frames and paired JSON diagnostics to a local folder for camera reliability testing. Those controls are intentionally excluded from production builds. See [`docs/POSE_DEBUG_MODE.md`](./docs/POSE_DEBUG_MODE.md) for the capture workflow and privacy requirements.
 
+The workout character uses annotated sprite states from a shared atlas. Live on-device landmarks are normalized and matched to the nearest compatible annotated frame with switch stabilization; incomplete annotations fall back to deterministic states. See [`docs/SPRITE_STATE_AVATARS.md`](./docs/SPRITE_STATE_AVATARS.md) for the annotation and export workflow.
+
 For a camera-free product walkthrough, choose **VIEW GUIDED DEMO** from the initial safety notice or camera setup, or open `http://localhost:5173/?demo=1` after starting the app. Follow the floating tips to choose an isolated pixel and interact with each simulated workout state. Each tip identifies the walkthrough as a simulation, and exiting restores the participant's prior local state.
 
 ## Architecture and privacy

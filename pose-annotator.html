@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Pixel Coordinate Picker</title>
+  <title>Sprite Pose Annotator</title>
   <style>
     :root {
       color-scheme: light dark;
@@ -328,7 +328,8 @@
       <div class="toolbar">
         <div class="tool-group">
           <input id="fileInput" type="file" accept="image/*" aria-label="Open image">
-          <button id="sampleButton" type="button">Open sample</button>
+          <input id="manifestInput" type="file" accept="application/json,.json" aria-label="Open sprite-state manifest">
+          <button id="sampleButton" type="button">Open sprite sample</button>
         </div>
         <div class="tool-group">
           <label class="zoom-label" for="zoomInput">Zoom <strong id="zoomValue">8x</strong></label>
@@ -338,7 +339,7 @@
         <div class="readout" id="cursorReadout">x: -, y: -</div>
       </div>
       <div class="viewer">
-        <div id="emptyState" class="empty">Open an image to pick original pixel coordinates.</div>
+        <div id="emptyState" class="empty">Open a sprite image and its manifest to annotate one frame at a time.</div>
         <div id="stage" class="stage">
           <canvas id="imageCanvas"></canvas>
           <div id="gridOverlay"></div>
@@ -348,8 +349,19 @@
     </section>
 
     <aside class="sidebar" aria-label="Coordinates">
+      <div id="frameSection" class="section" hidden>
+        <h1>Sprite State</h1>
+        <div class="label-row">
+          <select id="frameSelect" aria-label="Active sprite frame"></select>
+        </div>
+        <div class="action-row" style="margin-top: 8px;">
+          <button id="previousFrameButton" type="button">Previous</button>
+          <button id="nextFrameButton" type="button">Next</button>
+          <span id="frameReadout" class="hint"></span>
+        </div>
+      </div>
       <div class="section">
-        <h1>Coordinate Picker</h1>
+        <h1>Pose Keypoints</h1>
         <div class="label-row">
           <select id="labelSelect" aria-label="Active point label"></select>
           <button id="clearPointButton" class="danger" type="button">Clear point</button>
@@ -384,8 +396,9 @@
         <h2>Export</h2>
         <div class="action-row" style="margin-bottom: 8px;">
           <button id="copyJsonButton" class="primary" type="button">Copy JSON</button>
+          <button id="downloadJsonButton" type="button">Download JSON</button>
           <button id="copyCsvButton" type="button">Copy CSV</button>
-          <button id="clearAllButton" class="danger" type="button">Clear all</button>
+          <button id="clearAllButton" class="danger" type="button">Clear frame</button>
         </div>
         <textarea id="outputArea" readonly spellcheck="false" aria-label="Coordinate output"></textarea>
       </div>
@@ -435,15 +448,21 @@
     const state = {
       image: null,
       imageName: "",
+      sourceWidth: 0,
+      sourceHeight: 0,
       width: 0,
       height: 0,
       zoom: 8,
       labels: [...defaultLabels],
       selectedLabel: defaultLabels[0],
-      points: {}
+      points: {},
+      manifest: null,
+      frameIndex: -1,
+      framePoints: {}
     };
 
     const fileInput = document.getElementById("fileInput");
+    const manifestInput = document.getElementById("manifestInput");
     const sampleButton = document.getElementById("sampleButton");
     const zoomInput = document.getElementById("zoomInput");
     const zoomValue = document.getElementById("zoomValue");
@@ -465,6 +484,12 @@
     const copyJsonButton = document.getElementById("copyJsonButton");
     const copyCsvButton = document.getElementById("copyCsvButton");
     const clearAllButton = document.getElementById("clearAllButton");
+    const downloadJsonButton = document.getElementById("downloadJsonButton");
+    const frameSection = document.getElementById("frameSection");
+    const frameSelect = document.getElementById("frameSelect");
+    const previousFrameButton = document.getElementById("previousFrameButton");
+    const nextFrameButton = document.getElementById("nextFrameButton");
+    const frameReadout = document.getElementById("frameReadout");
 
     function clamp(value, min, max) {
       return Math.max(min, Math.min(max, value));
@@ -481,8 +506,15 @@
     function setImage(img, name) {
       state.image = img;
       state.imageName = name;
-      state.width = img.naturalWidth || img.width;
-      state.height = img.naturalHeight || img.height;
+      state.sourceWidth = img.naturalWidth || img.width;
+      state.sourceHeight = img.naturalHeight || img.height;
+      if (state.manifest?.frames?.length) {
+        activateFrame(Math.max(0, state.frameIndex));
+        return;
+      }
+      state.width = state.sourceWidth;
+      state.height = state.sourceHeight;
+      state.frameIndex = -1;
       state.points = {};
       canvas.width = state.width;
       canvas.height = state.height;
@@ -498,7 +530,59 @@
       if (!state.image) return;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(state.image, 0, 0, state.width, state.height);
+      const frame = activeFrame();
+      if (frame) {
+        const { x, y, width, height } = frame.bounds;
+        ctx.drawImage(state.image, x, y, width, height, 0, 0, width, height);
+      } else {
+        ctx.drawImage(state.image, 0, 0, state.width, state.height);
+      }
+    }
+
+    function activeFrame() {
+      return state.manifest?.frames?.[state.frameIndex] || null;
+    }
+
+    function pointsFromFrame(frame) {
+      return Object.fromEntries(Object.entries(frame?.points || {}).flatMap(([label, value]) => {
+        if (Array.isArray(value) && value.length >= 2) return [[label, { x: Number(value[0]), y: Number(value[1]) }]];
+        if (value && Number.isFinite(Number(value.x)) && Number.isFinite(Number(value.y))) return [[label, { x: Number(value.x), y: Number(value.y) }]];
+        return [];
+      }));
+    }
+
+    function activateFrame(index) {
+      if (!state.manifest?.frames?.length || !state.image) return;
+      state.frameIndex = clamp(index, 0, state.manifest.frames.length - 1);
+      const frame = activeFrame();
+      state.width = frame.bounds.width;
+      state.height = frame.bounds.height;
+      state.labels = (state.manifest.requiredPoints || [])
+        .map(point => `${frame.side || "left"}_${point}`);
+      if (!state.labels.length) state.labels = [...defaultLabels];
+      state.selectedLabel = state.labels.includes(state.selectedLabel) ? state.selectedLabel : state.labels[0];
+      state.framePoints[frame.id] ||= pointsFromFrame(frame);
+      state.points = state.framePoints[frame.id];
+      canvas.width = state.width;
+      canvas.height = state.height;
+      pointOverlay.setAttribute("viewBox", `0 0 ${state.width} ${state.height}`);
+      emptyState.style.display = "none";
+      stage.classList.add("is-ready");
+      drawImage();
+      updateZoom();
+      renderAll();
+    }
+
+    function setManifest(manifest) {
+      if (!manifest?.atlas || !Array.isArray(manifest.frames)) throw new Error("Manifest must include atlas and frames.");
+      state.manifest = typeof structuredClone === "function"
+        ? structuredClone(manifest)
+        : JSON.parse(JSON.stringify(manifest));
+      state.framePoints = Object.fromEntries(manifest.frames.map(frame => [frame.id, pointsFromFrame(frame)]));
+      state.frameIndex = 0;
+      frameSection.hidden = false;
+      if (state.image) activateFrame(0);
+      else renderFrames();
     }
 
     function updateZoom() {
@@ -588,7 +672,40 @@
         .join("");
     }
 
+    function renderFrames() {
+      if (!state.manifest?.frames?.length) {
+        frameSection.hidden = true;
+        return;
+      }
+      frameSection.hidden = false;
+      frameSelect.innerHTML = state.manifest.frames.map((frame, index) => {
+        const pointCount = Object.keys(state.framePoints[frame.id] || {}).length;
+        const requiredCount = state.manifest.requiredPoints?.length || 0;
+        const status = frame.matchable === false ? "not matched" : `${pointCount}/${requiredCount}`;
+        return `<option value="${index}">${escapeHtml(frame.label || frame.id)} · ${status}</option>`;
+      }).join("");
+      frameSelect.value = String(state.frameIndex);
+      const frame = activeFrame();
+      frameReadout.textContent = frame ? `${state.frameIndex + 1}/${state.manifest.frames.length} · ${frame.id}` : "";
+      previousFrameButton.disabled = state.frameIndex <= 0;
+      nextFrameButton.disabled = state.frameIndex >= state.manifest.frames.length - 1;
+    }
+
     function exportObject() {
+      if (state.manifest) {
+        return {
+          ...state.manifest,
+          atlas: {
+            ...state.manifest.atlas,
+            width: state.sourceWidth || state.manifest.atlas.width,
+            height: state.sourceHeight || state.manifest.atlas.height
+          },
+          frames: state.manifest.frames.map(frame => ({
+            ...frame,
+            points: Object.fromEntries(Object.entries(state.framePoints[frame.id] || {}).map(([label, point]) => [label, [point.x, point.y]]))
+          }))
+        };
+      }
       const points = {};
       for (const label of state.labels) {
         if (state.points[label]) {
@@ -606,6 +723,13 @@
     }
 
     function csvText() {
+      if (state.manifest) {
+        const rows = ["frame_id,label,x,y"];
+        for (const frame of state.manifest.frames) {
+          for (const [label, point] of Object.entries(state.framePoints[frame.id] || {})) rows.push(`${frame.id},${label},${point.x},${point.y}`);
+        }
+        return rows.join("\n");
+      }
       const rows = ["label,x,y"];
       for (const label of state.labels) {
         const point = state.points[label];
@@ -641,6 +765,7 @@
     }
 
     function renderAll() {
+      renderFrames();
       renderLabels();
       renderOverlay();
       renderPointsList();
@@ -669,9 +794,31 @@
       img.src = URL.createObjectURL(file);
     });
 
-    sampleButton.addEventListener("click", () => {
-      loadImageFromUrl("apps/web/static/charaplanko-pixel.png", "charaplanko-pixel.png");
+    manifestInput.addEventListener("change", async () => {
+      const file = manifestInput.files && manifestInput.files[0];
+      if (!file) return;
+      try {
+        setManifest(JSON.parse(await file.text()));
+      } catch (error) {
+        alert(`Could not load sprite manifest: ${error.message}`);
+      }
     });
+
+    sampleButton.addEventListener("click", async () => {
+      try {
+        const response = await fetch("apps/web/src/lib/pose/sprite-states.json");
+        if (!response.ok) throw new Error("manifest unavailable");
+        setManifest(await response.json());
+        loadImageFromUrl("apps/web/static/poses/hf-chara.png", "hf-chara.png");
+      } catch {
+        emptyState.textContent = "Serve the repository over HTTP, or choose hf-chara.png and sprite-states.json with the two file inputs.";
+        emptyState.style.display = "grid";
+      }
+    });
+
+    frameSelect.addEventListener("change", () => activateFrame(Number(frameSelect.value)));
+    previousFrameButton.addEventListener("click", () => activateFrame(state.frameIndex - 1));
+    nextFrameButton.addEventListener("click", () => activateFrame(state.frameIndex + 1));
 
     zoomInput.addEventListener("input", updateZoom);
     gridInput.addEventListener("change", updateZoom);
@@ -774,6 +921,15 @@
       }, 900);
     });
 
+    downloadJsonButton.addEventListener("click", () => {
+      const blob = new Blob([outputArea.value], { type: "application/json" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = state.manifest ? "sprite-states.json" : `${state.imageName || "pose"}.json`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    });
+
     copyCsvButton.addEventListener("click", async () => {
       await copyText(csvText());
       copyCsvButton.textContent = "Copied";
@@ -783,7 +939,13 @@
     });
 
     clearAllButton.addEventListener("click", () => {
-      state.points = {};
+      const frame = activeFrame();
+      if (frame) {
+        state.framePoints[frame.id] = {};
+        state.points = state.framePoints[frame.id];
+      } else {
+        state.points = {};
+      }
       renderAll();
     });
 
