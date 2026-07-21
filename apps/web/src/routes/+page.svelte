@@ -10,6 +10,7 @@
   import { createAudioFeedback } from '$lib/pose/audio-feedback.js';
   import { analyzePoseFrame, resetPoseAnalyzer } from '$lib/pose/engine.js';
   import { createSpriteStateMatcher } from '$lib/pose/sprite-matcher.js';
+  import { loadSpriteAnnotations } from '$lib/pose/sprite-annotations.js';
   import spriteStateData from '$lib/pose/sprite-states.json';
   import SpriteAvatar from '$lib/SpriteAvatar.svelte';
   import { addCompletionDay, calculateStreak, COMPLETION_DAYS_STORAGE_KEY, formatResetCountdown, normalizeCompletionDays } from '$lib/live-status.js';
@@ -20,7 +21,7 @@
 
   const spriteManifest: any = spriteStateData;
   const spriteFramesById: Map<string, any> = new Map<string, any>(spriteManifest.frames.map((frame: any) => [frame.id, frame]));
-  const spriteMatcher = createSpriteStateMatcher(spriteManifest);
+  let spriteMatcher = createSpriteStateMatcher(spriteManifest);
   const CELEBRATION_FRAME_SECONDS = 0.16;
   const celebrationFrames = ['celebrate-01', 'celebrate-02', 'celebrate-03'].map((id, index) => ({
     frame: spriteFramesById.get(id),
@@ -550,6 +551,11 @@
   }
 
   onMount(() => {
+    void loadSpriteAnnotations(spriteManifest).then((annotatedManifest) => {
+      spriteMatcher = createSpriteStateMatcher(annotatedManifest);
+    }).catch((error) => {
+      if (dev) console.warn('Sprite annotations unavailable; using deterministic fallbacks.', error);
+    });
     syncLocalStreak();
     liveResetLabel = formatResetCountdown();
     resetInterval = setInterval(() => { liveResetLabel = formatResetCountdown(); }, 1000);
