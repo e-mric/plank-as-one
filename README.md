@@ -158,4 +158,4 @@ Original project source code and documentation are available under the [MIT Lice
 
 ## Submission status
 
-The repository contains a runnable local prototype, an optional persistent/realtime canvas implementation, an MIT software license, and a dependency/asset ledger. A Supabase-backed public judging deployment with two-browser evidence, public YouTube demonstration, verified `/feedback` Session ID, and final entrant asset sign-off are still required before final submission.
+The repository contains a runnable local prototype, an optional persistent/realtime canvas implementation, an MIT software license, and an approved dependency/asset ledger for the current repository and application scope. A Supabase-backed public judging deployment with two-browser evidence, public YouTube demonstration and final-media review, and verified `/feedback` Session ID are still required before final submission.

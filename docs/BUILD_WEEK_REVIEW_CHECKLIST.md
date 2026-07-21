@@ -6,7 +6,7 @@
 
 **Rules source:** [OpenAI Build Week Official Rules](https://openai.devpost.com/rules)
 
-**Rules last checked:** 2026-07-15
+**Rules last checked:** 2026-07-21
 
 **Sponsor:** OpenAI OpCo, LLC
 
@@ -50,7 +50,7 @@ These findings describe the repository as observed on 2026-07-15 and must be rec
 | BLOCKED | P0 | No repository README or repository license was found. | Add the required Codex collaboration narrative, setup/test instructions, architecture summary, and dependency/license information. If the repository is public, add an appropriate project license; if private, share it with the required judging addresses. |
 | BLOCKED | P0 | Team eligibility and authorized Representative are not documented. | Record every member's eligibility and designate one authorized Representative. |
 | FAIL if used | P0 | A recognizable Forrest Gump/Tom Hanks depiction, film clip, soundtrack, trademark, or copied scene would create third-party IP and submission-video risk without permission. | Use the original runner placeholder or retain written rights evidence covering the application, repository assets, screenshots, video, and promotional use. |
-| BLOCKED | P1 | Third-party SDK, font, model, artwork, audio, and generated-asset licenses have not been collected into a reviewable ledger. | Create and approve an asset/dependency license ledger before the demo is recorded. |
+| PASS | P1 | Third-party SDK, font, model, artwork, audio, and generated-asset sources and licenses are recorded in the approved ledger. | Re-open [`ASSET_LICENSES.md`](../ASSET_LICENSES.md) if dependencies or submission assets change, and complete the separate final-video media review. |
 | BLOCKED | P1 | The working tree contains modified, deleted, and untracked artifacts. | Produce a clean, reproducible release commit and verify that no required presentation, asset, secret, or generated file is missing. |
 
 ## 3. Event timing and submission control
