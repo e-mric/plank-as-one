@@ -181,6 +181,15 @@ test('guided demo uses isolated state and never changes real progress counters',
   assert.equal(demo.cells[demo.selectedCell].status, 'pending');
   demo = confirmReadyPosition(demo);
   demo = tick(demo, 3000);
+  demo = setForm(demo, 'hips-low', { kind: 'hips-low', label: 'HIPS UP' });
+  assert.equal(demo.stage, 'grace');
+  demo = setForm(demo, 'hips-high', { kind: 'hips-high', label: 'HIPS DOWN' });
+  assert.equal(demo.form, 'hips-high');
+  demo = setForm(demo, 'tracking');
+  demo = tick(demo, 500);
+  assert.equal(demo.stage, 'paused');
+  demo = setForm(demo, 'valid');
+  assert.equal(demo.stage, 'active');
   demo = tick(demo, 1000);
   assert.equal(demo.stage, 'complete');
   assert.equal(demo.completionMethod, 'guided-demo');

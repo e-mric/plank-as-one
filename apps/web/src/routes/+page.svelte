@@ -18,7 +18,7 @@
 
   type Pixel = { id: number; status: string };
   type Action = { type: string; mode?: string; cellId?: number; form?: string; ms?: number; correction?: any; ready?: boolean };
-  type DemoTipId = 'welcome' | 'positioning' | 'countdown' | 'active' | 'correction' | 'recovery' | 'complete';
+  type DemoTipId = 'welcome' | 'positioning' | 'countdown' | 'active' | 'correction' | 'high-correction' | 'out-of-frame' | 'recovery' | 'complete';
 
   const spriteManifest: any = spriteStateData;
   const poseDevToolsEnabled = isPoseDevToolsEnabled({
@@ -33,12 +33,14 @@
     alt: index === 2 ? 'Pixel-art athlete celebrating with both fists raised' : 'Pixel-art athlete celebrating after completing the plank',
   }));
   const DEMO_TIPS: Record<DemoTipId, { step: string; title: string; copy: string; action: string }> = {
-    welcome: { step: 'TIP 1 OF 6', title: 'CHOOSE A PIXEL', copy: 'Select any outlined pixel in the shared artwork. The guided demo uses an isolated copy, so your choice will not reserve a real pixel.', action: 'LET ME CHOOSE' },
-    positioning: { step: 'TIP 2 OF 6', title: 'GET INTO POSITION', copy: 'Camera mode normally waits until your full body is visible and stable. For this walkthrough, use the button below to simulate a ready plank.', action: 'SIMULATE READY POSITION' },
-    countdown: { step: 'TIP 3 OF 6', title: 'HOLD READY', copy: 'The three-second countdown has started. Keep holding your position; the walkthrough will pause again when credited time begins.', action: 'CONTINUE COUNTDOWN' },
-    active: { step: 'TIP 4 OF 6', title: 'WATCH LIVE FORM', copy: 'The timer advances only while form is valid. Try a simulated mistake to see the correction and five-cell grace period.', action: 'SIMULATE HIPS TOO LOW' },
-    correction: { step: 'TIP 5 OF 6', title: 'FOLLOW THE CORRECTION', copy: 'The timer stops crediting time while the grace cells run down. Correct the highlighted form issue to resume.', action: 'CORRECT MY FORM' },
-    recovery: { step: 'TIP 6 OF 6', title: 'COMPLETE THE PLANK', copy: 'Valid form restores the timer. Finish the isolated walkthrough to see the selected pixel lock into the canvas.', action: 'COMPLETE DEMO' },
+    welcome: { step: 'TIP 1 OF 8', title: 'CHOOSE A PIXEL', copy: 'Select any outlined pixel in the shared artwork. The guided demo uses an isolated copy, so your choice will not reserve a real pixel.', action: 'LET ME CHOOSE' },
+    positioning: { step: 'TIP 2 OF 8', title: 'GET INTO POSITION', copy: 'Camera mode normally waits until your full body is visible and stable. For this walkthrough, use the button below to simulate a ready plank.', action: 'SIMULATE READY POSITION' },
+    countdown: { step: 'TIP 3 OF 8', title: 'HOLD READY', copy: 'The three-second countdown has started. Keep holding your position; the walkthrough will pause again when credited time begins.', action: 'CONTINUE COUNTDOWN' },
+    active: { step: 'TIP 4 OF 8', title: 'WATCH LIVE FORM', copy: 'The timer advances only while form is valid. Try a simulated mistake to see the correction and five-cell grace period.', action: 'SIMULATE HIPS TOO LOW' },
+    correction: { step: 'TIP 5 OF 8', title: 'HIPS TOO LOW', copy: 'The timer stops crediting time while the grace cells run down. Follow HIPS UP and the highlighted body area to correct the pose.', action: 'SIMULATE HIPS TOO HIGH' },
+    'high-correction': { step: 'TIP 6 OF 8', title: 'HIPS TOO HIGH', copy: 'When the hips rise too far, the direction reverses. Follow HIPS DOWN to bring the body back into a straighter line.', action: 'SIMULATE OUT OF FRAME' },
+    'out-of-frame': { step: 'TIP 7 OF 8', title: 'TRACKING PAUSED', copy: 'If you leave the camera frame, pose tracking pauses and no time is credited. Return your full body to the frame to continue.', action: 'RETURN TO FRAME' },
+    recovery: { step: 'TIP 8 OF 8', title: 'COMPLETE THE PLANK', copy: 'Valid form restores the timer. Finish the isolated walkthrough to see the selected pixel lock into the canvas.', action: 'COMPLETE DEMO' },
     complete: { step: 'COMPLETE', title: 'YOUR DEMO PIXEL IS LIVE', copy: 'That was a simulation. No real progress, streak, daily count, or shared pixel was changed.', action: 'EXIT GUIDED DEMO' },
   };
   const PIXEL_LOGO_GLYPHS: Record<string, string[]> = {
@@ -143,6 +145,8 @@
       ? { kind: 'hips-low', frameId: 'forearm-plank-knees-02', alt: 'Pixel-art athlete planking with hips too low' }
     : state.form === 'hips-high' && (state.stage === 'grace' || state.stage === 'paused')
       ? { kind: 'hips-high', frameId: 'forearm-plank-high', alt: 'Pixel-art athlete planking with hips too high' }
+    : trackingVisible
+      ? { kind: 'tracking', frameId: null, alt: 'Pose tracking paused while the participant is out of frame' }
     : state.stage === 'grace' || state.stage === 'paused' || state.form !== 'valid'
       ? { kind: 'bad', frameId: 'lowering-02', alt: 'Pixel-art athlete with incorrect plank form' }
       : { kind: 'ready', frameId: 'kneel-02', alt: 'Pixel-art athlete getting into position' };
@@ -504,6 +508,19 @@
       return;
     }
     if (demoTip === 'correction') {
+      dispatch({ type: 'set-form', form: 'hips-high', correction: { kind: 'hips-high', label: 'HIPS DOWN', voice: 'Hips down.' } });
+      demoTip = 'high-correction';
+      demoTipOpen = true;
+      return;
+    }
+    if (demoTip === 'high-correction') {
+      dispatch({ type: 'set-form', form: 'tracking' });
+      dispatch({ type: 'tick', ms: 500 });
+      demoTip = 'out-of-frame';
+      demoTipOpen = true;
+      return;
+    }
+    if (demoTip === 'out-of-frame') {
       dispatch({ type: 'set-form', form: 'valid' });
       demoTip = 'recovery';
       demoTipOpen = true;
