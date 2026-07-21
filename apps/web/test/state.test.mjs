@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applySharedCanvasSnapshot, createGuidedDemoState, createInitialState, chooseMode, acknowledgeSafety, selectCell, confirmReadyPosition, tick, setForm, endSession, markDailyCompleted, reduce, ARTWORK_WIDTH, ARTWORK_HEIGHT } from '../state.js';
+import { applySharedCanvasSnapshot, createGuidedDemoState, createInitialState, chooseMode, acknowledgeSafety, selectCell, confirmReadyPosition, tick, setForm, endSession, markDailyCompleted, reduce, ARTWORK_WIDTH, ARTWORK_HEIGHT, GUIDED_DEMO_BUILD_REVEAL_COUNT } from '../state.js';
 
 const availableCell = (state, offset = 0) => state.cells.filter((cell) => cell.status === 'available')[offset].id;
 
@@ -179,6 +179,16 @@ test('guided demo uses isolated state and never changes real progress counters',
   assert.equal(demo.demo, true);
   assert.equal(demo.stage, 'positioning');
   assert.equal(demo.cells[demo.selectedCell].status, 'pending');
+  const demoLockedCount = demo.cells.filter((cell) => cell.status === 'locked').length;
+  const openAiTargets = demo.cells.filter((cell) => cell.target && Math.floor(cell.id / ARTWORK_WIDTH) < 7);
+  const buildLocked = demo.cells.filter((cell) => cell.status === 'locked' && Math.floor(cell.id / ARTWORK_WIDTH) >= 8 && Math.floor(cell.id / ARTWORK_WIDTH) < 15);
+  const weekLocked = demo.cells.filter((cell) => cell.status === 'locked' && Math.floor(cell.id / ARTWORK_WIDTH) >= 16);
+  assert.equal(openAiTargets.every((cell) => cell.status === 'locked'), true);
+  assert.equal(buildLocked.length, GUIDED_DEMO_BUILD_REVEAL_COUNT);
+  assert.equal(weekLocked.length, 0);
+  assert.equal(demoLockedCount, openAiTargets.length + GUIDED_DEMO_BUILD_REVEAL_COUNT);
+  assert.equal(demo.todayCount, demoLockedCount);
+  const demoStartingCount = demo.todayCount;
   demo = confirmReadyPosition(demo);
   demo = tick(demo, 3000);
   demo = setForm(demo, 'hips-low', { kind: 'hips-low', label: 'HIPS UP' });
@@ -193,7 +203,7 @@ test('guided demo uses isolated state and never changes real progress counters',
   demo = tick(demo, 1000);
   assert.equal(demo.stage, 'complete');
   assert.equal(demo.completionMethod, 'guided-demo');
-  assert.equal(demo.todayCount, 128);
+  assert.equal(demo.todayCount, demoStartingCount);
   assert.equal(demo.streak, 7);
   assert.equal(demo.target, 1);
   assert.deepEqual(real, snapshot);

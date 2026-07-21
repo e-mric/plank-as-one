@@ -4,6 +4,10 @@ export { ARTWORK_ROWS, ARTWORK_WIDTH, ARTWORK_HEIGHT };
 export const GRID_WIDTH = ARTWORK_WIDTH;
 export const GRID_HEIGHT = ARTWORK_HEIGHT;
 export const SAFETY_COPY_VERSION = 'mvp-1';
+export const GUIDED_DEMO_BUILD_REVEAL_COUNT = 12;
+const GUIDED_DEMO_OPENAI_ROWS = 7;
+const GUIDED_DEMO_BUILD_START_ROW = 8;
+const GUIDED_DEMO_BUILD_END_ROW = 15;
 
 export function createInitialState(overrides = {}) {
   const targetIds = ARTWORK_ROWS.flatMap((row, y) => row.map((pixel, x) => pixel === '1' ? y * GRID_WIDTH + x : null).filter((id) => id !== null));
@@ -72,9 +76,20 @@ export function applySharedCanvasSnapshot(state, rows, { ownedCellId = state.sel
 }
 
 export function createGuidedDemoState(source, { target = 8, autoStart = true } = {}) {
+  const targetCells = source.cells.filter((cell) => cell.target);
+  const headlineCells = targetCells.filter((cell) => Math.floor(cell.id / GRID_WIDTH) < GUIDED_DEMO_OPENAI_ROWS);
+  const buildCells = targetCells.filter((cell) => {
+    const row = Math.floor(cell.id / GRID_WIDTH);
+    return row >= GUIDED_DEMO_BUILD_START_ROW && row < GUIDED_DEMO_BUILD_END_ROW;
+  });
+  const lockedIds = new Set(headlineCells.map((cell) => cell.id));
+  Array.from({ length: GUIDED_DEMO_BUILD_REVEAL_COUNT }, (_, index) => (
+    buildCells[Math.floor(index * buildCells.length / GUIDED_DEMO_BUILD_REVEAL_COUNT)].id
+  )).forEach((id) => lockedIds.add(id));
+  const lockedCount = lockedIds.size;
   const cells = source.cells.map((cell) => ({
     ...cell,
-    status: cell.status === 'pending' ? 'available' : cell.status,
+    status: !cell.target ? 'empty' : lockedIds.has(cell.id) ? 'locked' : 'available',
   }));
   const base = {
     ...source,
@@ -92,6 +107,7 @@ export function createGuidedDemoState(source, { target = 8, autoStart = true } =
     selectedCell: null,
     requestedCell: null,
     cells,
+    todayCount: lockedCount,
     completions: 0,
     dailyCompleted: false,
     existingDailyCompletion: false,
